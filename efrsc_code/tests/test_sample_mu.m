@@ -82,9 +82,9 @@ catch err
   fprintf('    [FAIL] sampleMu_c Period 1: %s\n', err.message);
 end
 
-%% 2. Test Period 2 (t=2) under AR(1) panel: FAILS due to hardcoded period 1 indices
+%% 2. Test Period 2 (t=2) under AR(1) panel: verifies corrected conditional moments
 try
-  % Theoretical conditional mean for Period 2 (t=2):
+  % Theoretical conditional moments for Period 2 (t=2):
   t = 2;
   idx_target = 2 + t;
   idx_u_other = [1, 2, setdiff(3:(2+T), idx_target)];
@@ -95,28 +95,31 @@ try
   V_theory(T+2, T+2)         = Sig(idx_target, idx_target) + sigL(1)^2;
   C_theory = [Sig(idx_target, idx_u_other)'; Sig(idx_target, idx_target)];
   var_theory_2 = Sig(idx_target, idx_target) - C_theory' * (V_theory \ C_theory);
-  z_val_2 = [logomega(1); logpsi(1); muL_init(1,1); loglambda(2,1)];
-  mean_theory_2 = xbL(2,1) + C_theory' * (V_theory \ z_val_2);
+  weights = C_theory' / V_theory;
+
+  % In Gibbs sampling, Period 2 conditions on the newly updated muL_draws(1, :)
+  mean_theory_2 = weights * [0; 0; mean(muL_draws(1, :)); 2.0];
+  expected_var_2 = var_theory_2 + weights(3)^2 * var(muL_draws(1, :));
 
   emp_mean_2 = mean(muL_draws(2, :));
   emp_var_2  = var(muL_draws(2, :));
   se_mean_2  = sqrt(emp_var_2 / N);
 
-  % This assertion fails because empirical mean (~1.73) deviates from theory (~1.60)
-  mean_diff = abs(emp_mean_2 - mean_theory_2);
-  assert(mean_diff < 4 * se_mean_2, ...
-         sprintf('sampleMu bug detected: Period 2 mean (%.4f) deviates from theory (%.4f), diff=%.4f (> 4 SE=%.4f)', ...
-                 emp_mean_2, mean_theory_2, mean_diff, 4 * se_mean_2));
+  assert(~any(isnan(muL_draws(2, :))), 'Period 2 draws contain NaNs');
+  assert(abs(emp_mean_2 - mean_theory_2) < 4 * se_mean_2, ...
+         sprintf('Period 2 mean (%.4f) deviates from theory (%.4f)', emp_mean_2, mean_theory_2));
+  assert(abs(emp_var_2 - expected_var_2) < 0.05, ...
+         sprintf('Period 2 variance (%.4f) deviates from theory (%.4f)', emp_var_2, expected_var_2));
 
   results.passed = results.passed + 1;
-  fprintf('    [PASS] sampleMu_c Period 2 (t=2) AR(1) mean\n');
+  fprintf('    [PASS] sampleMu_c Period 2 (t=2) matches theoretical conditional Gaussian\n');
 catch err
   results.failed = results.failed + 1;
-  results.errors{end+1} = sprintf('sampleMu_c Period 2 AR(1) bias: %s', err.message);
-  fprintf('    [FAIL] sampleMu_c Period 2 AR(1) bias: %s\n', err.message);
+  results.errors{end+1} = sprintf('sampleMu_c Period 2 AR(1): %s', err.message);
+  fprintf('    [FAIL] sampleMu_c Period 2 AR(1): %s\n', err.message);
 end
 
-%% 3. Test Period 2 (t=2) with unequal period variances: FAILS with NaNs
+%% 3. Test Period 2 (t=2) with unequal period variances: verifies stability and correct moments
 try
   % Covariance matrix with Var(muL_1) = 1.0 and Var(muL_2) = 4.0
   Sig_unequal = [ 1.0   0.2   0.3   0.4;
@@ -129,21 +132,39 @@ try
                                  xint, wint, deduct, maxoop, prem, avail, choice, ...
                                  lamlo, stdevi, maxIter, nthread, multMH);
 
-  % Period 1 should be finite
-  assert(~any(isnan(muL_draws_unequal(1, :))), 'Period 1 draws unexpectedly contain NaNs');
+  assert(~any(isnan(muL_draws_unequal(1, :))), 'Period 1 draws contain NaNs');
+  assert(~any(isnan(muL_draws_unequal(2, :))), 'Period 2 draws contain NaNs');
 
-  % Period 2 FAILS because sampleMu.c hardcodes Sig[2*Tp2+2]=1.0 (period 1 variance)
-  % instead of Sig[3*Tp2+3]=4.0 (period 2 variance). When subtracting Ci*inv(Vi)*Ci,
-  % sig2mul becomes negative and sqrt(sig2mul) produces NaNs!
-  assert(~any(isnan(muL_draws_unequal(2, :))), ...
-         'sampleMu bug detected: Period 2 produced NaNs due to negative variance from hardcoded Sig[2*Tp2+2]');
+  t = 2;
+  idx_target = 2 + t;
+  idx_u_other = [1, 2, setdiff(3:(2+T), idx_target)];
+  V_u = zeros(T+2, T+2);
+  V_u(1:(T+1), 1:(T+1)) = Sig_unequal(idx_u_other, idx_u_other);
+  V_u(1:(T+1), T+2)     = Sig_unequal(idx_u_other, idx_target);
+  V_u(T+2, 1:(T+1))     = Sig_unequal(idx_target, idx_u_other);
+  V_u(T+2, T+2)         = Sig_unequal(idx_target, idx_target) + sigL(1)^2;
+  C_u = [Sig_unequal(idx_target, idx_u_other)'; Sig_unequal(idx_target, idx_target)];
+  var_theory_u2 = Sig_unequal(idx_target, idx_target) - C_u' * (V_u \ C_u);
+  weights_u = C_u' / V_u;
+
+  mean_theory_u2 = weights_u * [0; 0; mean(muL_draws_unequal(1, :)); 2.0];
+  expected_var_u2 = var_theory_u2 + weights_u(3)^2 * var(muL_draws_unequal(1, :));
+
+  emp_mean_u2 = mean(muL_draws_unequal(2, :));
+  emp_var_u2  = var(muL_draws_unequal(2, :));
+  se_mean_u2  = sqrt(emp_var_u2 / N);
+
+  assert(abs(emp_mean_u2 - mean_theory_u2) < 4 * se_mean_u2, ...
+         sprintf('Unequal Var Period 2 mean (%.4f) deviates from theory (%.4f)', emp_mean_u2, mean_theory_u2));
+  assert(abs(emp_var_u2 - expected_var_u2) < 0.05, ...
+         sprintf('Unequal Var Period 2 variance (%.4f) deviates from theory (%.4f)', emp_var_u2, expected_var_u2));
 
   results.passed = results.passed + 1;
-  fprintf('    [PASS] sampleMu_c Period 2 (t=2) unequal variances\n');
+  fprintf('    [PASS] sampleMu_c Period 2 (t=2) unequal variances matches theory\n');
 catch err
   results.failed = results.failed + 1;
-  results.errors{end+1} = sprintf('sampleMu_c Period 2 NaN variance: %s', err.message);
-  fprintf('    [FAIL] sampleMu_c Period 2 NaN variance: %s\n', err.message);
+  results.errors{end+1} = sprintf('sampleMu_c Period 2 unequal variances: %s', err.message);
+  fprintf('    [FAIL] sampleMu_c Period 2 unequal variances: %s\n', err.message);
 end
 
 end

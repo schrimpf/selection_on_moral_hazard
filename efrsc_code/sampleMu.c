@@ -105,12 +105,12 @@ void *sampleMu(void *voidptr)
           j1++;
         }
       } // now the part for lambda
-      for (t1=0;t1<Tp2;t1++) {
-        Vi[(1+sa->T)*(Tp2)+t1] = Sig[(Tp2-1)*(Tp2)+t1];
-        Vi[t1*(Tp2)+(1+sa->T)] = Sig[(Tp2-1)*(Tp2)+t1];
+      for (j1=0;j1<(1+sa->T);j1++) {
+        Vi[(1+sa->T)*(Tp2)+j1] = Ci[j1];
+        Vi[j1*(Tp2)+(1+sa->T)] = Ci[j1];
       }
       Vi[(1+sa->T)*(Tp2)+(1+sa->T)] = Sig[(t+2)*(Tp2)+(t+2)]+sa->sigL[i]*sa->sigL[i];
-      Ci[1+sa->T] = Sig[2*(Tp2)+2];
+      Ci[1+sa->T] = Sig[(t+2)*(Tp2)+(t+2)];
       /*
         if (sa->tid==0 && i<=10) {
         mexPrintf("i=%d t=%d\nSig = \n",i,t);
@@ -167,7 +167,7 @@ void *sampleMu(void *voidptr)
         }
       }
       */
-      sig2mul = Sig[2*(Tp2)+2];
+      sig2mul = Sig[(t+2)*(Tp2)+(t+2)];
       //if (sa->tid==0) mexPrintf("sig2mul=%g, info=%d\n",sig2mul,info);
       meanmul  = sa->xbL[i*sa->T+t];
       for(j1=0;j1<Tp2;j1++) {
