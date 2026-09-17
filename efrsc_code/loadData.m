@@ -72,34 +72,7 @@ function data=loadData(file,drop,maxyear,lx,lxll,lxhs)
   end
 
   %% read data from file
-  if (isOctave) % octave lacks 'importData'
-    fid = fopen(file,'r');
-    line = fgets(fid);
-    rect.text = strsplit(line,',');
-    rect.data = [];
-    line = fgets(fid);
-    lineNum = 1;
-    [status txtout] = system(sprintf('wc -l %s',file));
-    totlines = sscanf(txtout,'%d');
-    tic;
-    while (line~=-1) 
-      row = NaN*zeros(1,length(rect.text));
-      strval = strsplit(line,',');
-      [new count] = cellfun(@(str) sscanf(str,'%f'),strval,'UniformOutput',0);
-      notmissing=find(cell2mat(count)==1);
-      row(notmissing) = [new{notmissing}];
-      rect.data = [rect.data; row];
-      line = fgets(fid);
-      lineNum = lineNum+1;
-      if (mod(lineNum,250)==0) 
-        fprintf('Read %d out of %d lines of %s\n',lineNum,totlines,file)
-        toc;
-      end
-    end
-    fclose(fid);
-  else % matlab's importdata is faster
-    rect = importdata(file,',');
-  end
+  rect = importdata(file,',');
   % only keep 2003 and 2004
   rect.data = rect.data(rect.data(:,2)<=maxyear,:);
 

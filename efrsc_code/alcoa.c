@@ -8,13 +8,13 @@ void sigintHandler(int sig) {
 }
 
 int choiceFnHuge
-(const double omega, const double psi, const double muL, const double sigL, 
+(const double omega, const double psi, const double muL, const double sigL,
  const double *xint, const double *wint, const int nint,
  const double *deduct, const double *maxoop, const double *prem, const int nplan,
  const double copay, const double dl, const int multMH, double *exVal, double *exSpend, double *exOop);
 
 int choiceFn
-(const double omega, const double psi, const double muL, const double sigL, 
+(const double omega, const double psi, const double muL, const double sigL,
  const double *xint, const double *wint, const int nint,
  const double *deduct, const double *maxoop, const double *prem, const int nplan,
  const double copay, const int multMH, double *exVal, double *exSpend, double *exOop)
@@ -24,8 +24,8 @@ int choiceFn
 }
 
 static int negLambdaZeroUtil = 0;
-void setNegLambdaZeroUtil(int val) { 
-  negLambdaZeroUtil = val; 
+void setNegLambdaZeroUtil(int val) {
+  negLambdaZeroUtil = val;
 }
 
 double utilfn(const double spend,const double lambda,const double omega,
@@ -34,13 +34,13 @@ double utilfn(const double spend,const double lambda,const double omega,
     //return((1+lambda/omega)*spend - spend*spend/(2*omega));
     if (lambda<=0) return 0;
     else return((spend-lambda)-(spend-lambda)*(spend-lambda)/(2*omega*lambda) - cost);
-  } else { // additive 
+  } else { // additive
     if (negLambdaZeroUtil && lambda<0) return 0;
     else return((spend-lambda)-(spend-lambda)*(spend-lambda)/(2*omega) - cost);
   }
 }
-double spendFn(const double lambda, const double omega, const double copay, 
-               const int multMH) { 
+double spendFn(const double lambda, const double omega, const double copay,
+               const int multMH) {
   if (multMH) {
     if (lambda<=0) return 0;
     else return(lambda*(1+omega*(1-copay)));
@@ -49,7 +49,7 @@ double spendFn(const double lambda, const double omega, const double copay,
   }
 }
 
-void solveSpend(double *spend, double *util, double *oop, 
+void solveSpend(double *spend, double *util, double *oop,
                 const double lambda, const double omega, const double copay,
                 const double deduct, const double maxoop,
                 const int multMH)
@@ -57,39 +57,40 @@ void solveSpend(double *spend, double *util, double *oop,
   double m;
   *util = utilfn(0,lambda,omega,0,multMH);
   *spend = 0;
+  *oop = 0;
   //un = util;
   m = spendFn(lambda,omega,1.0,multMH);
   //if (m>0) un = omega/2-lambda;
   if (m > 0 && m < deduct) {
     double u0 = utilfn(m,lambda,omega,m,multMH);
     if (u0>(*util)) { (*util) = u0; *spend = m; *oop=m;}
-  } 
+  }
   m = spendFn(lambda,omega,copay,multMH);
-  if (m>=deduct && m < (deduct + (maxoop-deduct)/copay) && m>0) {  
+  if (m>=deduct && m < (deduct + (maxoop-deduct)/copay) && m>0) {
     double thisOop = deduct + copay*(m-deduct);
     double u0 = utilfn(m,lambda,omega,thisOop,multMH);
     if (u0>*util) { *util = u0;  *spend=m; *oop=thisOop; }
-  } 
+  }
   m = spendFn(lambda,omega,0,multMH);
   if (m>=deduct + (maxoop-deduct)/copay) {
     double u0 = utilfn(m,lambda,omega,maxoop,multMH);
     if (u0>*util) { *util = u0; *spend=m; *oop=maxoop;}
-  }                
-  return;  
+  }
+  return;
 }
 
 
 int choiceFnEx
-(const double omega, const double psi, const double muL, const double sigL, 
+(const double omega, const double psi, const double muL, const double sigL,
  const double *xint, const double *wint, const int nint,
  const double *deduct, const double *maxoop, const double *prem, const int nplan,
- const double copay, const double dl, const int multMH, 
+ const double copay, const double dl, const int multMH,
  double *exVal, double *exSpend, double *exOop)
 {
   int J=0;
   long double mev=-HUGE_VAL;
   int k;
-  for(k=0;k<nplan;k++) {   
+  for(k=0;k<nplan;k++) {
     if (deduct[k] < 0) continue;
     int i;
     long double ev = 0;
@@ -99,8 +100,8 @@ int choiceFnEx
       double lambda, oop, orate,m,util,spend,coop;
       int c;
       lambda = exp(xint[i]*sigL + muL) + dl;
-      solveSpend(&spend,&util,&coop, 
-                 lambda, omega, copay, deduct[k], maxoop[k], multMH);      
+      solveSpend(&spend,&util,&coop,
+                 lambda, omega, copay, deduct[k], maxoop[k], multMH);
       ev += expl(-psi*util)*wint[i];
       exSpend[k] += spend*wint[i];
       exOop[k] += coop*wint[i];
@@ -109,36 +110,36 @@ int choiceFnEx
       if (!isfinite(ev)) {
         //mexPrintf("WARNING(choiceFn): overflow, switching to choiceFnHuge\n");
         return(choiceFnHuge(omega,  psi,  muL,  sigL,  xint,  wint, nint,
-                            deduct,  maxoop,  prem, nplan,  copay, dl, multMH, 
+                            deduct,  maxoop,  prem, nplan,  copay, dl, multMH,
                             exVal, exSpend,exOop));
-      }      
-    } // for(i<nint) 
+      }
+    } // for(i<nint)
     ev = -logl(ev) - psi*prem[k];
     //mexPrintf("%d: v=%Lg vn=%Lg\n",k,ev,-logl(evn));
     exVal[k]= ev; // + logl(evn))/psi;
     if (!isfinite(ev)) {
       //mexPrintf("WARNING(choiceFn): overflow, switching to choiceFnHuge\n");
       return(choiceFnHuge(omega,  psi,  muL,  sigL,  xint,  wint, nint,
-                          deduct,  maxoop,  prem, nplan,  copay, dl, multMH, 
+                          deduct,  maxoop,  prem, nplan,  copay, dl, multMH,
                           exVal, exSpend, exOop));
-    }      
+    }
     //mexPrintf(" u(%d)=%Lg \n",k,ev);
-    if (k==0 || ev>mev) { mev = ev; J = k+1; }    
-  } // for(k<nplan) 
+    if (k==0 || ev>mev) { mev = ev; J = k+1; }
+  } // for(k<nplan)
   //mexPrintf("\n");
   if (!isfinite(mev)) {
     J = 0; // mev is -inf or nan
     //mexPrintf("WARNING(choiceFn): max E[V] = %Lg\n",mev);
   }
-  
+
   // for testing only
-  /*{ 
+  /*{
     int Jhuge =choiceFnHuge(omega,  psi,  muL,  sigL,  xint,  wint, nint,
-                            deduct,  maxoop,  prem, nplan,  copay); 
+                            deduct,  maxoop,  prem, nplan,  copay);
     if (J!=Jhuge) {
       mexPrintf("warning: choiceFn=%d, choiceFnHuge=%d psi=%g\n",J,Jhuge,psi);
     }
-    } */ 
+    } */
   return(J);
 }
 
@@ -146,12 +147,12 @@ int choiceFnEx
 #include <mpfr.h>
 #define MPFR_USE_FILE
 // number of bits for mantissa of large numbers -- set to 53 to match double
-#define PREC 53 
+#define PREC 53
 int choiceFnHuge
-(const double omega, const double psi, const double muL, const double sigL, 
+(const double omega, const double psi, const double muL, const double sigL,
  const double *xint, const double *wint, const int nint,
  const double *deduct, const double *maxoop, const double *prem, const int nplan,
- const double copay, const double dl, const int multMH, 
+ const double copay, const double dl, const int multMH,
  double *exVal, double *exSpend, double *exOop)
 {
   int J=0;
@@ -173,9 +174,9 @@ int choiceFnHuge
       int c;
       lambda = exp(xint[i]*sigL + muL) + dl;
       //if (lambda<0) lambda = 0;
-      solveSpend(&spend,&util,&coop, 
-                 lambda, omega, copay, deduct[k], maxoop[k], multMH);      
-      { 
+      solveSpend(&spend,&util,&coop,
+                 lambda, omega, copay, deduct[k], maxoop[k], multMH);
+      {
         mpfr_t euw;
         mpfr_init2(euw,PREC); // euw = exp(-psi*util)
         mpfr_set_d(euw,-psi*util,GMP_RNDN);
@@ -190,7 +191,7 @@ int choiceFnHuge
       }
       exSpend[k] += wint[i]*spend;
       exOop[k] += wint[i]*coop;
-    } // for(i<nint) 
+    } // for(i<nint)
     // ev = -log(ev)-psi*prem[k]
     mpfr_log(ev,ev,GMP_RNDN);
     mpfr_mul_si(ev,ev,-1,GMP_RNDN);
@@ -199,13 +200,13 @@ int choiceFnHuge
     //mexPrintf("huge: u(%d) = %Lg \n",k,mpfr_get_ld(ev,GMP_RNDN));
     exVal[k]=mpfr_get_d(ev,GMP_RNDN);
     //if (!isfinite(exVal[k])) mexPrintf("warning: exVal[k] not finite\n");
-    if (k==0 || mpfr_cmp(ev,mev)>0) //(k==0 || ev>mev) 
-      { 
-        mpfr_set(mev,ev,GMP_RNDN); //mev = ev; 
-        J = k+1; 
+    if (k==0 || mpfr_cmp(ev,mev)>0) //(k==0 || ev>mev)
+      {
+        mpfr_set(mev,ev,GMP_RNDN); //mev = ev;
+        J = k+1;
       }
     mpfr_clear(ev);
-  } // for(k<nplan) 
+  } // for(k<nplan)
   mpfr_clear(mev);
   //mexPrintf("\n");
   //if (!finitel(mev)) {
@@ -222,18 +223,18 @@ int choiceFnHuge
 //////////////////////////////////////////////// RANDOM NUMBER GENERATION ///////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-/*  Parameters for: 
+/*  Parameters for:
     Marsaglia & Tsang generator for random normals & random exponentials.
-    Marsaglia, G. & Tsang, W.W. (2000) `The ziggurat method for generating random variables', J. Statist. Software, 
+    Marsaglia, G. & Tsang, W.W. (2000) `The ziggurat method for generating random variables', J. Statist. Software,
     v5(8). This is an electronic journal which can be downloaded from:  http://www.jstatsoft.org/v05/i08 */
 
-static inline unsigned int SHR3(struct randState *rs) 
-{ return(rs->jz=rs->jsr, 
-         rs->jsr^=(rs->jsr<<13), 
-         rs->jsr^=(rs->jsr>>17), 
+static inline unsigned int SHR3(struct randState *rs)
+{ return(rs->jz=rs->jsr,
+         rs->jsr^=(rs->jsr<<13),
+         rs->jsr^=(rs->jsr>>17),
          rs->jsr^=(rs->jsr<<5),
          rs->jz+rs->jsr); }
-static inline double UNI(struct randState *rs) 
+static inline double UNI(struct randState *rs)
 { return(.5 + (signed) SHR3(rs)*.2328306e-9); }
 #define IUNI(rs) SHR3(rs)
 #define EPSILON  1.110326e-16
@@ -261,7 +262,7 @@ static double nfix(struct randState *rs)
 }
 
 static double efix(struct randState *rs)
-{ // efix() generates variates from the residue when rejection in REXP occurs. 
+{ // efix() generates variates from the residue when rejection in REXP occurs.
   double x;
   for(;;) {
     if(rs->iz==0) return (7.69711-log(UNI(rs)));          /* iz==0 */
@@ -274,11 +275,11 @@ static double efix(struct randState *rs)
   }
 }
 
-static inline double RNOR(struct randState *rs) 
-{ return(rs->hz=SHR3(rs), rs->iz=rs->hz&127, 
+static inline double RNOR(struct randState *rs)
+{ return(rs->hz=SHR3(rs), rs->iz=rs->hz&127,
          (fabs(rs->hz)<rs->kn[rs->iz])? rs->hz*rs->wn[rs->iz] : nfix(rs)); }
-static inline double REXP(struct randState *rs) 
-{ return(rs->jz=SHR3(rs), rs->iz=rs->jz&255, 
+static inline double REXP(struct randState *rs)
+{ return(rs->jz=SHR3(rs), rs->iz=rs->jz&255,
          (rs->jz <rs->ke[rs->iz])? rs->jz*rs->we[rs->iz] : efix(rs)); }
 
 unsigned int get_jsr(struct randState *rs)
@@ -294,15 +295,15 @@ void set_jsr(unsigned int jsrin, struct randState *rs)
 
 // This helps when you want to start the seuqence at the same place again
 void reset_seed(unsigned int jsrseed, struct randState *rs)
-{ // This procedure sets the seed and creates the tables.  
+{ // This procedure sets the seed and creates the tables.
   //************************** THIS IS WHAT MAKES IT DIFFERENT FROM SET_SEED ****************************************//
-  rs->jsr = 123456789; 
+  rs->jsr = 123456789;
   //*****************************************************************************************************************//
   rs->jsr^=jsrseed;
 }
 
 void set_seed(unsigned int jsrseed, struct randState *rs)
-{ // This procedure sets the seed and creates the tables.  
+{ // This procedure sets the seed and creates the tables.
   const double m1 = 2147483648.0, m2 = 4294967296.;
   double dn=3.442619855899,tn=dn,vn=9.91256303526217e-3, q;
   double de=7.697117470131487, te=de, ve=3.949659822581572e-3;
@@ -349,7 +350,7 @@ void set_time_seed(RANDSTATE *rs)
 }
 
 double Sample_Uniform(const double a,const double b, struct randState *rs)
-{ 
+{
   time_t t;
   if (rs->seed_initialized!=1) set_seed((unsigned int) time(&t),rs);
   return(UNI(rs)*(b-a) + a);
@@ -364,7 +365,7 @@ double Sample_Normal(const double mu,const double var, struct randState *rs)
 
 
 #define T4 0.45
-double Sample_Truncated_Normal(const double mu,const double var,const double a,const int lb, struct randState *rs) 
+double Sample_Truncated_Normal(const double mu,const double var,const double a,const int lb, struct randState *rs)
 { // Returns one draw from a truncated normal with underlying mean=mu and VARIANCE=var with truncation
   //           (a,+infty)    IF lb=TRUE(not 0)
   //           (-infty,a)    IF lb=FALSE(0)
@@ -603,9 +604,9 @@ float genbet(float aa,float bb, struct randState *rs)
                x^(a-1) * (1-x)^(b-1) / B(a,b) for 0 < x < 1
                               Arguments
      aa --> First parameter of the beta distribution
-       
+
      bb --> Second parameter of the beta distribution
-       
+
                               Method
      R. C. H. Cheng
      Generating Beta Variatew with Nonintegral Shape Parameters
@@ -777,16 +778,16 @@ S220:
 
 /* the following function gives the optimal number of components              */
 /* for p=0.95 fixed                                                           */
-int n_optimal(b)                                              
+int n_optimal(b)
      double b;
 {
   double nr,q;
-  q=1.64;                                                  
-  nr=floor(pow(q+sqrt(q*q+4*b),2.0)/4.0-1.0); 
+  q=1.64;
+  nr=floor(pow(q+sqrt(q*q+4*b),2.0)/4.0-1.0);
   return((int) nr);
 }
 
-/* the following function returns a random number from TG^-(a,b,1)            */ 
+/* the following function returns a random number from TG^-(a,b,1)            */
 double inter_ri(a,b,rs)
      double a,b;
      struct randState *rs;
@@ -804,12 +805,12 @@ double inter_ri(a,b,rs)
       wl[i]=wl[i-1]*b/(a+i);
       wlc[i]=wlc[i-1]+wl[i];
     };
-  for(i=0; i<=n; i++) 
-    { 
+  for(i=0; i<=n; i++)
+    {
       wlc[i]=wlc[i]/wlc[n];
     };
   y=1.0; yy=1.0;
-  for (i=1; i<=n; i++) 
+  for (i=1; i<=n; i++)
     {
       yy=yy*b/i; y=y+yy;
     };
@@ -826,7 +827,7 @@ double inter_ri(a,b,rs)
         {
           zz=zz*(1-x)*b/i;
           z=z+zz;
-        }; 
+        };
       z=exp(-b*x)*y/z;
       if (u <= z ) {test=1.0;};
     };
@@ -838,10 +839,10 @@ double inter_ri(a,b,rs)
 /* the following function returns a random number from TG^-(a,b,1)            */
 /* algorithm [A_1N]  N fixed such that P(N)> .95                              */
 /* N fixed such that P(N)> .95                                                */
-double gamma_right(a,b,t,rs)                             
-     double a,b,t;         
-     struct randState *rs;                        
-{ 
+double gamma_right(a,b,t,rs)
+     double a,b,t;
+     struct randState *rs;
+{
   return(inter_ri(a,b*t,rs)*t);
 };
 
@@ -855,7 +856,7 @@ double gamma_right(a,b,t,rs)
 /* See Devroye, L. (1985) Non-Uniform Random Variate Generation  */
 /* Springer-Verlag, New-York.  */
 
-double integer(a,b,rs)                             
+double integer(a,b,rs)
      double a,b;
      struct randState *rs;
 {
@@ -888,13 +889,13 @@ double integer(a,b,rs)
       mexErrMsgTxt("Going to segfault.");
     }
   }
-  x=Sample_Gamma( (double) i,1,rs)/b+1.0;        
+  x=Sample_Gamma( (double) i,1,rs)/b+1.0;
   myFree(wl);
-  myFree(wlc);               
+  myFree(wlc);
   return(x);
 };
 
-/* the following function returns a random number from TG^+(a,b,1)            */   
+/* the following function returns a random number from TG^+(a,b,1)            */
 double inter_le(a,b,rs)
      double a,b;
      struct randState *rs;
@@ -912,7 +913,7 @@ double inter_le(a,b,rs)
     }
   else
     {
-      if (a<b) 
+      if (a<b)
         {
           M=exp(floor(a)-a);
           while (test == 0)
@@ -940,7 +941,7 @@ double inter_le(a,b,rs)
 
 /* the following function returns a random number from TG^+(a,b,t)            */
 /* algorithm [A_5]                                                            */
-double gamma_left(a,b,t,rs)                                 
+double gamma_left(a,b,t,rs)
      double a,b,t;
      struct randState *rs;
 {
@@ -949,8 +950,8 @@ double gamma_left(a,b,t,rs)
 
 
 #define MAXITER 100
-double Sample_Truncated_Gamma(const double ain, const double b, 
-                              const double lo, const double hi, struct randState *rs) 
+double Sample_Truncated_Gamma(const double ain, const double b,
+                              const double lo, const double hi, struct randState *rs)
 { /*
     Returns a number distributed as a truncated gamma distribution
    with shape parameter a and inverse scale b.  such that mean=a/b and
@@ -975,7 +976,7 @@ double Sample_Truncated_Gamma(const double ain, const double b,
       return(x);
     } else {
       // use method of Phillipe above
-      x = gamma_left(ain,b,lo,rs);     
+      x = gamma_left(ain,b,lo,rs);
       return(x);
     }
   } else { // truncated on both sides
@@ -985,7 +986,7 @@ double Sample_Truncated_Gamma(const double ain, const double b,
       if ((iter%2)==0) x = gamma_right(ain,b,hi,rs);
       else x = gamma_left(ain,b,lo,rs);
     }
-    // NOTE: this may be very efficient, but it isn't needed in the current code anyway ...    
+    // NOTE: this may be very efficient, but it isn't needed in the current code anyway ...
   }
   if (iter>=MAXITER) {
     mexPrintf("Sample_Truncated_Gamma: max iter reached a=%g b=%g, lo=%g hi=%g\n",ain,b,lo,hi);
@@ -993,5 +994,3 @@ double Sample_Truncated_Gamma(const double ain, const double b,
   } else return(x);
 }
 #undef MAXITER
-
-

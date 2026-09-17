@@ -1,9 +1,12 @@
-clear; close all;
+close all;
+path(path,'..');
 config;
 load(resultFile);
 nSim = data.N*10;
 seed = 1337; %sum(100*clock);
 setSeed(seed);
+clear options;
+clear b15data;
 options.cf = true;
 options.nosel = true;
 options.sampleAll=true;
@@ -46,7 +49,7 @@ setSeed(seed);
 options.balance15 = 0.5;
 b15data{1}=simulate(nSim,data,beta,Sigma,gamma,rho,shape,theta,bll,sigll,alpha, ...
                     options);
-% spending changes 
+% spending changes
 dsFN = b15data{1}.spendFI(2,:) - b15data{1}.spendNI(2,:);
 s5 = b15data{1};
 s5.choice(:) = 5;

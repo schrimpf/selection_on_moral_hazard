@@ -1,4 +1,5 @@
-clear; close all;
+close all;
+path(path,'..');
 config;
 subsidy = 0.0;
 prefix = [prefix 's00'];
@@ -11,6 +12,7 @@ if (isOctave)
 else
   dbstop if error;
 end
+clear options;
 options.cf = true;
 options.nosel = true;
 options.sampleAll=true;
@@ -242,11 +244,15 @@ for g=1:4
   dq = 0.02;
   %tau = dq:dq:(1-dq);
   tau = 0:dq:(1);
-  xi = quantile(x(ind),tau);
+  xi = unique(quantile(x(ind),tau));
+  if (numel(xi) == 1)
+    xi = [xi - 1, xi + 1];
+  end
   [junk rankOrder] = sort(x(ind));
   tauL = tau-0.1;
   tauH = tau+0.1;
   qx = rankOrder/numel(x(ind));  
+  clear dpi dwi dvi dci;
   for i=1:numel(xi)
     % Silverman's rule for bandwidth
     bw = 0.9 * std(x(simdata.covg==g))*sum(simdata.covg==g)^(-1/5); 
@@ -332,11 +338,15 @@ for g=1:4
   dq = 0.02;
   %tau = dq:dq:(1-dq);
   tau = 0:dq:(1);
-  xi = quantile(x(ind),tau);
+  xi = unique(quantile(x(ind),tau));
+  if (numel(xi) == 1)
+    xi = [xi - 1, xi + 1];
+  end
   [junk rankOrder] = sort(x(ind));
   tauL = tau-0.1;
   tauH = tau+0.1;
   qx = rankOrder/numel(x(ind));  
+  clear dpi dwi dvi dci;
   for i=1:numel(xi)
         % Silverman's rule for bandwidth 
     bw = 0.9 * std(x(simdata.covg==g))*sum(simdata.covg==g)^(-1/5); 
@@ -595,11 +605,15 @@ for g=1:4
   dq = 0.02;
   %tau = dq:dq:(1-dq);
   tau = 0:dq:(1);
-  xi = quantile(x(ind),tau);
+  xi = unique(quantile(x(ind),tau));
+  if (numel(xi) == 1)
+    xi = [xi - 1, xi + 1];
+  end
   [junk rankOrder] = sort(x(ind));
   tauL = tau-0.1;
   tauH = tau+0.1;
   qx = rankOrder/numel(x(ind));  
+  clear dpi dwi dvi dci;
   for i=1:numel(xi)
         % Silverman's rule for bandwidth
     bw = 0.9 * std(x(simdata.covg==g))*sum(simdata.covg==g)^(-1/5); 

@@ -33,7 +33,7 @@ function slideTables2(sdata,prefix,csv)
   x = [squeeze([sdata.exSpend(5,2,ind)-sdata.exSpend(1,2,ind)]) ...
        sdata.eMoralHaz(ind)];
   [q fy]=plotSpend(x,y,nq,@(x) mean(x),false,true);
-  legend('E[spend|c=5]-E[spend|c=1]','E[spend|full ins]-E[spend|no ins]',0);
+  legend('E[spend|c=5]-E[spend|c=1]','E[spend|full ins]-E[spend|no ins]','Location','best');
   ylabel('P(c=5)');
   xlabel('Quantiles');
   print('-depsc2',sprintf('figures/%sP5ESquant',prefix)); 
@@ -44,7 +44,7 @@ function slideTables2(sdata,prefix,csv)
   [q fy]=plotSpend(x,y,nq,@(x) mean(x),false,true);
   xlabel('Quantiles');
   ylabel('P(c=5)');
-  legend('\omega','\psi','E[\lambda]',0);
+  legend('\omega','\psi','E[\lambda]','Location','best');
   print('-depsc2',sprintf('figures/%sP5latent',prefix)); 
   out = fopen(sprintf('tex/tables/%sP5latent',prefix),'w');
   makeTable(out,{'$\omega$','$\psi$','$E[\lambda]$'},q,fy);

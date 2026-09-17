@@ -1,0 +1,17 @@
+al.csv
+*.csv
+*.mat
+*.mex
+*.mex*
+*.o
+*~
+#*#
+.#*
+arms/
+efrsc_code/arms/
+mexopts.sh
+*.eps
+postEst/figures/
+postEst/tex/tables/
+postEst/csv/
+

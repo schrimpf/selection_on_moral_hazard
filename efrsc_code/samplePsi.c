@@ -96,7 +96,7 @@ void *sampleP(void *voidptr)
     //mexPrintf("%4d: %5.3g %5.3g\n      %5.3g %5.3g\n",i,rpm[0+i*4],rpm[1+i*4],rpm[2+i*4],rpm[3+i*4]);
     //mexPrintf("%4d: %d\n",
   }
-  return;
+  return NULL;
 }
 
 void mexFunction
@@ -175,7 +175,8 @@ void mexFunction
   //mexPrintf("freed args\n");
   myFree(thrptr);
   { 
-    int verbosity = (int) mxGetScalar(mexGetVariable("global","verbosity"));
+    const mxArray *v_arr = mexGetVariable("global","verbosity");
+    int verbosity = v_arr ? (int) mxGetScalar(v_arr) : 0;
     if (verbosity>0) {
       mexPrintf("samplePsi: avg tries=%g, reached max %d times, overflow %d times (%.2lf)\n",
                 ((double) tottries)/((double) N),nbad,totover,((double) totover)/((double) tottries));

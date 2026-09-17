@@ -8,7 +8,7 @@
 #include <string.h>
 #include "mex.h" /* header file for matlab API */
 #include "alcoa.h"
-#include <pthread.h>
+#include <omp.h>
 
 #define copay 0.1
 
@@ -50,49 +50,6 @@ struct sampleArgs {
   int end;
 };
 
-void *sampleSigL(void *voidptr)
-{
-  struct sampleArgs *sa = (struct sampleArgs*) voidptr;
-  int i;
-  sa->tottries=0;
-  sa->nbad=0;
-  for(i=sa->start;i<sa->end;i++) {
-    int accept=0;
-    int tries=0;
-    double sl;
-    while (!accept) {
-      int t; 
-      accept=1;
-      sl = sqrt(1.0/Sample_Truncated_Gamma(sa->shapei[i],1.0/sa->scalei[i],1/sa->varHi,1/sa->varLo,&rs[sa->tid]));
-      //mexPrintf("%g %g\n",sl,sigL[i]);
-      for(t=0;t<sa->T && accept;t++) {
-        if (sa->choice[t+i*sa->T]>=0) {
-          double exv[5];
-          int J = choiceFnEx(exp(sa->logomega[i]),sa->psi[i],sa->muL[i*sa->T+t],sl,sa->xint, sa->wint,sa->nint,
-                             sa->deduct+t*sa->np+i*sa->T*sa->np, sa->maxoop+t*sa->np+i*sa->T*sa->np, 
-                             sa->prem+t*sa->np+i*sa->T*sa->np, sa->np, copay,-sa->lamlo[i],
-                             sa->multMH, 
-                             exv,exv,exv);        
-          //mexPrintf("%d: %d %d\n",i,choice[t+i*T],J);
-          accept = (((int) sa->choice[t+i*sa->T])== J);
-          if (!accept) break;
-        }
-      }
-      tries++;
-      if (tries>sa->maxIter) {
-        sa->nbad++;
-        //mexPrintf("obs %d: too many rejections\n",i);
-        break;
-      }
-      //accept = 1;
-    }
-    if (tries<=sa->maxIter) {
-      sa->sigLout[i] = sl;
-    }
-    sa->tottries += tries;
-  }    
-}
-
 void mexFunction
 (int nlhs, /* number of left hand side arguments */
  mxArray *plhs[], /* pointer to lhs*/
@@ -100,12 +57,11 @@ void mexFunction
  const mxArray *prhs[]) /* pointer to rhs arguments*/
 {
   /* rhs args */
-  struct sampleArgs sa, *ta;
+  struct sampleArgs sa;
   int N; /* number of observations */
   int i;
-  int tottries = 0, nbad=0;
+  int tottries = 0, nbad = 0;
   int nthread;
-  pthread_t *thrptr;
 
   if (nrhs!=20) {
     mexPrintf("nrhs=%d\n",nrhs);
@@ -145,34 +101,49 @@ void mexFunction
   // limits on variance
   sa.varLo = mxGetScalar(prhs[17]);
   sa.varHi = mxGetScalar(prhs[18]);
-  sa.multMH = (int) mxGetScalar(prhs[18]);
+  sa.multMH = (int) mxGetScalar(prhs[19]);
   /* Create and get outputs */
   plhs[0] = mxCreateDoubleMatrix(1,N,mxREAL);
   sa.sigLout = mxGetPr(plhs[0]);
   memcpy(sa.sigLout,sa.sigL,sizeof(double)*N);
   
-  // spawn threads
-  ta = myCalloc(nthread,sizeof(struct sampleArgs));
-  thrptr = myCalloc(nthread,sizeof(pthread_t));
-  for(i=0;i<nthread;i++) {
-    memcpy(ta+i,&sa,sizeof(struct sampleArgs));
-    ta[i].tid = i;
-    ta[i].start = i*N/nthread;
-    if (i<nthread-1) ta[i].end = (i+1)*N/nthread;
-    else ta[i].end = N;       
-    pthread_create(thrptr+i,NULL, sampleSigL, (void *) (ta+i)); 
+  if (nthread > 0) {
+    omp_set_num_threads(nthread);
   }
-  // join threads
-  for (i=0;i<nthread;i++) {
-    void *status; 
-    pthread_join(thrptr[i],&status);
-    tottries += ta[i].tottries;
-    nbad += ta[i].nbad;
+
+  #pragma omp parallel for schedule(dynamic, 16) reduction(+:tottries) reduction(+:nbad)
+  for (i = 0; i < N; i++) {
+    int tid = omp_get_thread_num();
+    int accept = 0;
+    int tries = 0;
+    double sl;
+    while (!accept) {
+      int t; 
+      accept = 1;
+      sl = sqrt(1.0/Sample_Truncated_Gamma(sa.shapei[i], 1.0/sa.scalei[i], 1/sa.varHi, 1/sa.varLo, &rs[tid]));
+      for (t = 0; t < sa.T && accept; t++) {
+        if (sa.choice[t+i*sa.T] >= 0) {
+          double exv[5];
+          int J = choiceFnEx(exp(sa.logomega[i]), sa.psi[i], sa.muL[i*sa.T+t], sl, sa.xint, sa.wint, sa.nint,
+                             sa.deduct+t*sa.np+i*sa.T*sa.np, sa.maxoop+t*sa.np+i*sa.T*sa.np, 
+                             sa.prem+t*sa.np+i*sa.T*sa.np, sa.np, copay, -sa.lamlo[i],
+                             sa.multMH, 
+                             exv, exv, exv);        
+          accept = (((int) sa.choice[t+i*sa.T]) == J);
+          if (!accept) break;
+        }
+      }
+      tries++;
+      if (tries > sa.maxIter) {
+        nbad++;
+        break;
+      }
+    }
+    if (tries <= sa.maxIter) {
+      sa.sigLout[i] = sl;
+    }
+    tottries += tries;
   }
-  //mexPrintf("joined\n");
-  myFree(ta);
-  //mexPrintf("freed args\n");
-  myFree(thrptr);
   { 
     int verbosity = (int) mxGetScalar(mexGetVariable("global","verbosity"));
     if (verbosity>0) {
