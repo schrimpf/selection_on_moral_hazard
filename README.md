@@ -6,13 +6,13 @@ Estimation programs for:
 
 The files in this repository generate the primary results in the paper. To actually run the estimation, the original data file (`al.csv`) is required. The data is proprietary and cannot be posted online. For further details about obtaining access to the data, please contact Liran Einav (<leinav@stanford.edu>) or Amy Finkelstein (<afink@mit.edu>). For questions about the code, please contact Paul Schrimpf (<schrimpf@mail.ubc.ca>).
 
-> **Note:** The code has been updated and verified to run on current versions of GNU Octave (tested on Octave 9.x), in addition to the original targets of Matlab 7.10.0 (R2010a) and Octave 3.6.1.
+> **Note:** The code has been updated and verified to run on current versions of GNU Octave (tested on Octave 9.x)
 
 ---
 
 ## Synthetic Data
 
-Because the original data is proprietary, **privacy-preserving synthetic datasets** are provided in `efrsc_code/postEst/csv/`:
+Because the original data is proprietary, **privacy-preserving synthetic datasets** are provided:
 
 | File | Description |
 |------|-------------|
@@ -40,9 +40,11 @@ createSyntheticData(opt);
 
 ### Prerequisites
 
-The majority of the code is for **Matlab** or **GNU Octave**. The code has been verified to run in:
+The majority of the code is for **Matlab** or **GNU Octave**. The code hosted here has been updated to run in Octave 9.x.
+
+The original code (available on ICPSR and linked from the AER website) has been verified to run in:
 - Matlab version 7.10.0.499 (R2010a)
-- Octave version 3.6.1 and current Octave 9.x releases
+- Octave version 3.6.1
 
 Computationally intensive portions are written as C-language mex files. To compile them you will need:
 
@@ -52,7 +54,7 @@ Computationally intensive portions are written as C-language mex files. To compi
 4. **MPFR** — compile with `--enable-thread-safe`<sup>2</sup>
 5. **NLOPT**<sup>1</sup>
 
-`make.m` attempts to download **ARMS**<sup>3</sup> automatically.
+`make.m` attempts to download **ARMS**<sup>3</sup> automatically from a url that is no longer active, so this repository now includes `arms.zip`.
 
 ### Setup
 
@@ -72,7 +74,7 @@ Execute `runGibbs.m` to produce Markov Chain Monte Carlo estimates:
 runGibbs
 ```
 
-This will take considerable time. Many options can be set in `runGibbs.m` to reproduce the robustness results in appendix table A8. The options are currently set to produce the baseline estimates.
+This will take considerable time (1-2 days when the paper was written, 1-2 hours on a modern computer with the updated code). Many options can be set in `runGibbs.m` to reproduce the robustness results in appendix table A8. The options are currently set to produce the baseline estimates.
 
 ### Graphs and Tables
 
