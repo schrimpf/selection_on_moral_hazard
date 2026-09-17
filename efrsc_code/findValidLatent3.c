@@ -1,6 +1,11 @@
 /* 
    Mex-function to find latent variables that rationalize choices.  
 */
+void utilDiff(double *utilDiff, const double *usl, 
+              const double *deduct,const double *maxoop,
+              const double *prem,const double copay, const int np,
+              const double *xint, const double *wint, const int nint,
+              const double *choice, const int T);
 void utilDiffHuge(double *diff, const double *usl,const double *deduct,const double *maxoop,
                   const double *prem,const double copay, const int np,
                   const double *xint, const double *wint, const int nint,
@@ -10,7 +15,7 @@ void utilDiffHuge(double *diff, const double *usl,const double *deduct,const dou
 #include "mex.h" /* header file for matlab API */
 #include "alcoa.h"
 #include <string.h>
-#include <pthread.h>
+#include <omp.h>
 #include <mpfr.h>
 #include <gmp.h>
 #include <nlopt.h>
@@ -84,8 +89,8 @@ double conFunc(int n, const double *x, double *grad, void *data)
     int np = uargs->np;
     int T = uargs->T;
     mxAssert(n<=10 && uargs->T<=5 && uargs->np<=5,"something is too big");
-    utilDiffHuge(diff,x, uargs->deduct+i*np*T, uargs->maxoop+i*np*T, uargs->prem+i*np*T,
-                 0.1, np, uargs->xint, uargs->wint, uargs->nint, uargs->choice+i*T, T);
+    utilDiff(diff,x, uargs->deduct+i*np*T, uargs->maxoop+i*np*T, uargs->prem+i*np*T,
+             0.1, np, uargs->xint, uargs->wint, uargs->nint, uargs->choice+i*T, T);
     return(diff[j]);
   }  
 }
@@ -104,8 +109,8 @@ double objFunc(int n, const double *x, double *grad, void *data)
     if (cf>0) val += cf*cf;
   }
   i = uargs->i;
-  utilDiffHuge(diff,x, uargs->deduct+i*np*T, uargs->maxoop+i*np*T, uargs->prem+i*np*T,
-               0.1, np, uargs->xint, uargs->wint, uargs->nint, uargs->choice+i*T, T);
+  utilDiff(diff,x, uargs->deduct+i*np*T, uargs->maxoop+i*np*T, uargs->prem+i*np*T,
+           0.1, np, uargs->xint, uargs->wint, uargs->nint, uargs->choice+i*T, T);
   for(i=0;i<T*np;i++) {
     if (diff[i]>0) val+=diff[i]*diff[i];
   }  
@@ -122,86 +127,43 @@ double objFunc(int n, const double *x, double *grad, void *x0)
 }
 */
 
-void *findValidLatent(void *argin) {
-  UARGS *uargs = (UARGS*) argin;
-  int np=uargs->np;
-  int T=uargs->T;
-  CONARGS *cargs = myCalloc(T+np*T,sizeof(CONARGS));      
-  int i;
-  double *u, *u0;
-  u = myCalloc(4+T,sizeof(double));
-  u0 = myCalloc(4+T,sizeof(double));
-  for(i=0;i<T+(np*T);i++) {
-    cargs[i].uargs = uargs;
-    cargs[i].t=i;
-    cargs[i].T = (T+np*T);
+static int optimizeOneObs(int i, UARGS *uargs, CONARGS *cargs, double *u, double *u0)
+{
+  int T = uargs->T;
+  int returnCode = 0;
+  double diff;
+  int t;
+  uargs->i = i;
+  u[0] = uargs->logomega[i];
+  u[1] = uargs->logpsi[i];
+  for (t = 0; t < T; t++) u[2+t] = uargs->muL[i*T + t];
+  u[2+T] = uargs->logsigL[i];
+  u[3+T] = uargs->lamlo[i];
+  memcpy(u0, u, (4+T)*sizeof(double));
+  for (t = 0; t < (4+T); t++) {
+    if (u[t] < uargs->lb[i*NU + t]) u[t] = uargs->lb[i*NU + t] + 0.001;
+    else if (u[t] > uargs->ub[i*NU + t]) u[t] = uargs->ub[i*NU + t] - 0.001;
   }
-  //mexPrintf("tid=%d: start=%d end=%d T=%d np=%d nint=%d\n"
-  //           ,pthread_self(),uargs->start,uargs->end,T,np,uargs->nint);
-  for(i=uargs->start;i<uargs->end;i++) {        
-    double diff;
-    int t;
-    int returnCode = 0;
-    uargs->i = i;
-    u[0] = uargs->logomega[i];
-    u[1] = uargs->logpsi[i];
-    for (t=0;t<T;t++) u[2+t] = uargs->muL[i*T+t];
-    u[2+T] = uargs->logsigL[i];
-    u[3+T] = uargs->lamlo[i];
-    memcpy(u0,u,(4+T)*sizeof(double));
-    for (t=0;t<(4+T);t++) {
-      if (u[t]<uargs->lb[i*NU+t]) u[t] = uargs->lb[i*NU+t]+0.001;
-      else if (u[t]>uargs->ub[i*NU+t]) u[t] = uargs->ub[i*NU+t]-0.001;
-    }
-    // set output to input in case of failure
-    memcpy(uargs->uout+i*(2+T),u,(2+T)*sizeof(double));
+  diff = objFunc(4+T, u, NULL, cargs);
+  if (diff > 0) {
+    returnCode = nlopt_minimize_constrained(NLOPT_GN_DIRECT_L, 4+T, objFunc, cargs,
+                                            0, NULL, NULL, 0,
+                                            uargs->lb + i*NU, uargs->ub + i*NU, u, &diff,
+                                            0, 0, 0, 1e-8, NULL, 0, 0.05);
+  }
+  if (diff <= 0) {
+    memcpy(uargs->uout + i*(2+T), u, (2+T)*sizeof(double));
     uargs->sigLout[i] = exp(u[2+T]);
-    diff = objFunc(4+T,u,NULL,cargs);
-    if (diff>0) {
-      returnCode = 
-        nlopt_minimize_constrained(NLOPT_GN_DIRECT_L, 4+T, objFunc, cargs,
-                                   0, NULL, NULL, 0,
-                                   uargs->lb+i*NU, uargs->ub+i*NU, u, &diff,
-                                   0 , 0, 0, 1e-8, NULL, 0, 1.0);
-      if (returnCode< 0) {
-        mexPrintf("nlopt failed! %d\n",returnCode);
-      } 
-    }
-    if (diff<=0) {
-      //mexPrintf("\n%d: Success %g",i,diff);
-      //for (t=0;t<T+T*np;t++) {       
-      //  mexPrintf(" %g ",conFunc(4+T,u,NULL,cargs+t));
-      //}
-      //mexPrintf("\n");
-      memcpy(uargs->uout+i*(2+T),u,(2+T)*sizeof(double));
-      uargs->sigLout[i] = exp(u[2+T]);
-      uargs->lamloout[i] = u[3+T];
-      uargs->fail[i] = 0;
-      //mexPrintf("diff = %g, i=%d\n",diff,i);
-    } else { /* return the input (set above)*/      
-      uargs->fail[i] = 1;
-      mexPrintf("%d: Failed to satisfy some constraints, returnCode=%d, fval=%g\n",
-                i,returnCode,diff);
-      for (t=0;t<T+T*np;t++) {       
-        mexPrintf(" %g ",conFunc(4+T,u,NULL,cargs+t));
-      }
-      memcpy(uargs->uout+i*(2+T),u,(2+T)*sizeof(double));
-      uargs->sigLout[i] = exp(u[2+T]);
-      uargs->lamloout[i] = u[3+T];        
-      
-      mexPrintf("\n bounds and x\n");
-      for (t=0;t<(4+T);t++) mexPrintf(" %6.3g ",uargs->lb[i*NU+t]);
-      mexPrintf("\n");
-      for (t=0;t<(4+T);t++) mexPrintf(" %6.3g ",u[t]);
-      mexPrintf("\n");
-      for (t=0;t<(4+T);t++) mexPrintf(" %6.3g ",uargs->ub[i*NU+t]);
-      mexPrintf("\n\n");
-    }
+    uargs->lamloout[i] = u[3+T];
+    uargs->fail[i] = 0;
+    return 0;
+  } else {
+    uargs->fail[i] = 1;
+    memcpy(uargs->uout + i*(2+T), u, (2+T)*sizeof(double));
+    uargs->sigLout[i] = exp(u[2+T]);
+    uargs->lamloout[i] = u[3+T];
+    return 1;
   }
-  myFree(u); 
-  myFree(u0); 
-  myFree(cargs);
-  pthread_exit(NULL);
 }
 
 void mexFunction
@@ -210,14 +172,11 @@ void mexFunction
  int nrhs, /* number of rhs arguments*/
  const mxArray *prhs[]) /* pointer to rhs arguments*/
 {
-  /* rhs args: muL[N],sigL,omega[N], psi[N], deduct[N], maxoop[N], prem[N], xint[nint], wint[nint] */  
-  int N,nbad = 0;
+  int N, nbad = 0;
   UARGS uargs;
-  UARGS *threadArgs;  
-  int threads, t;
-  pthread_t *thrptr;
-  signal(SIGINT,sigintHandler);
-  uargs.nbad = 0; //&nbad;
+  int threads;
+  signal(SIGINT, sigintHandler);
+  uargs.nbad = 0;
   uargs.muL = mxGetPr(prhs[0]);
   uargs.logsigL = mxGetPr(prhs[1]);
   uargs.logomega = mxGetPr(prhs[2]);
@@ -229,7 +188,7 @@ void mexFunction
   uargs.maxoop = mxGetPr(prhs[5]);
   uargs.prem = mxGetPr(prhs[6]);
   uargs.xint = mxGetPr(prhs[7]);
-  uargs.wint= mxGetPr(prhs[8]);
+  uargs.wint = mxGetPr(prhs[8]);
   uargs.nint = mxGetNumberOfElements(prhs[8]);
   uargs.choice = mxGetPr(prhs[9]);
   threads = (int) mxGetScalar(prhs[10]);
@@ -237,43 +196,65 @@ void mexFunction
   uargs.ub = mxGetPr(prhs[12]);
   uargs.lamlo = mxGetPr(prhs[13]); 
   uargs.spend = mxGetPr(prhs[14]);
-  mxAssert(threads<=MAXTHREADS,"too many threads\n");  
-  plhs[0] = mxCreateDoubleMatrix(2+uargs.T,N,mxREAL); 
-  plhs[1] = mxCreateDoubleMatrix(N,1,mxREAL);
-  plhs[2] = mxCreateDoubleMatrix(N,1,mxREAL);
-  plhs[3] = mxCreateLogicalMatrix(N,1);
+  mxAssert(threads <= MAXTHREADS, "too many threads\n");
+
+  plhs[0] = mxCreateDoubleMatrix(2+uargs.T, N, mxREAL); 
+  plhs[1] = mxCreateDoubleMatrix(N, 1, mxREAL);
+  plhs[2] = mxCreateDoubleMatrix(N, 1, mxREAL);
+  plhs[3] = mxCreateLogicalMatrix(N, 1);
   uargs.uout = mxGetPr(plhs[0]);
   uargs.sigLout = mxGetPr(plhs[1]);
   uargs.lamloout = mxGetPr(plhs[2]);
-  uargs.fail = mxGetLogicals(plhs[3]); 
-  thrptr = myCalloc(threads,sizeof(pthread_t));
-  threadArgs = myCalloc(threads,sizeof(UARGS));
-  if (seeds_initialized==0) {
-    for(t=0;t<MAXTHREADS;t++) randStateVec[t].seed_initialized=0;    
-    seeds_initialized=1;
-  }     
-  for (t=0;t<threads;t++) {
-    memcpy(threadArgs+t,&uargs,sizeof(UARGS));
-    threadArgs[t].tid = t;
-    threadArgs[t].start = t*N/threads;
-    if (t<threads-1) threadArgs[t].end = (t+1)*N/threads;
-    else threadArgs[t].end = N;       
-    //mexPrintf("creating thread %d, start=%d, end=%d\n",t,threadArgs[t].start,threadArgs[t].end);
-    pthread_create(thrptr+t,NULL, findValidLatent, (void *) (threadArgs+t)); 
-    //findValidLatent((void*) (threadArgs+t));
+  uargs.fail = mxGetLogicals(plhs[3]);
+
+  /* Pre-populate all outputs with current values */
+  for (int i = 0; i < N; i++) {
+    uargs.uout[i*(2+uargs.T) + 0] = uargs.logomega[i];
+    uargs.uout[i*(2+uargs.T) + 1] = uargs.logpsi[i];
+    for (int t = 0; t < uargs.T; t++) {
+      uargs.uout[i*(2+uargs.T) + 2 + t] = uargs.muL[i*uargs.T + t];
+    }
+    uargs.sigLout[i] = exp(uargs.logsigL[i]);
+    uargs.lamloout[i] = uargs.lamlo[i];
+    uargs.fail[i] = 0;
   }
-  for (t=0;t<threads;t++) {
-    void *status; 
-    //mexPrintf("%d: join=%d\n",t,
-    pthread_join(thrptr[t],&status);
-    nbad += threadArgs[t].nbad;
+
+  /* Optional badindex argument */
+  int nbadobs = -1;
+  double *badindices = NULL;
+  if (nrhs > 15 && !mxIsEmpty(prhs[15])) {
+    nbadobs = (int) mxGetNumberOfElements(prhs[15]);
+    badindices = mxGetPr(prhs[15]);
   }
-  //mexPrintf("joined\n");
-  myFree(threadArgs);
-  //mexPrintf("freed args\n");
-  myFree(thrptr);
-  //mexPrintf("freed threads\n"); 
-  if (nbad>0) mexPrintf("WARNING: failed to find valid latent for %d observations\n",nbad);
+
+  int totalTasks = (nbadobs >= 0) ? nbadobs : N;
+  if (threads > 0) {
+    omp_set_num_threads(threads);
+  }
+
+  #pragma omp parallel reduction(+:nbad)
+  {
+    UARGS my_uargs = uargs;
+    int T = my_uargs.T;
+    int np = my_uargs.np;
+    CONARGS cargs[1 + 5 + 25];
+    double u[4 + 5];
+    double u0[4 + 5];
+    for (int j = 0; j < T + (np * T); j++) {
+      cargs[j].uargs = &my_uargs;
+      cargs[j].t = j;
+      cargs[j].T = (T + np * T);
+    }
+    #pragma omp for schedule(dynamic, 1)
+    for (int k = 0; k < totalTasks; k++) {
+      int i = (badindices != NULL) ? ((int)(badindices[k] - 1)) : k;
+      if (i >= 0 && i < N) {
+        nbad += optimizeOneObs(i, &my_uargs, cargs, u, u0);
+      }
+    }
+  }
+
+  if (nbad > 0) mexPrintf("WARNING: failed to find valid latent for %d observations\n", nbad);
 }
      
 
@@ -283,12 +264,10 @@ void utilDiff(double *utilDiff, const double *usl,
               const double *xint, const double *wint, const int nint,
               const double *choice, const int T)
 {
-  double omega, psi, *muL, sigL, lamlo;
-  //long double utilDiff=0;
-  long double *util;
+  double omega, psi, sigL, lamlo;
+  long double util[5];
+  double muL[5];
   int t;
-  util = myCalloc(np,sizeof(long double));
-  muL = myCalloc(T,sizeof(double));
   omega = exp(usl[0]);
   psi = exp(usl[1]);
   for(t=0;t<T;t++) muL[t] = usl[2+t];
@@ -347,8 +326,6 @@ void utilDiff(double *utilDiff, const double *usl,
       utilDiff[k+t*np] = util[k]-util[c];
     }
   } // for(t)
-  myFree(util);                  
-  myFree(muL);
 }
 
 #define PREC 53

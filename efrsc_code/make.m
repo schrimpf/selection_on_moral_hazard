@@ -47,7 +47,7 @@ function make(force)
   putenv('CC','gcc');
   putenv('CXX','g++');
   putenv('F77','gfortran');
-  putenv('CFLAGS',['-O0 -fopenmp -std=c99 -fPIC ' ...
+  putenv('CFLAGS',['-O3 -fopenmp -std=c99 -fPIC ' ...
 		   '-march=native -Wall -g']); % change march as needed for
                                              % your system. If you get
                                              % SIGILL: illegal
@@ -108,7 +108,7 @@ function make(force)
     end
   end 
   if (needCompile('XtTimesKronSIdTimesY',ext) || force)
-    mex XtTimesKronSIdTimesY.c -v;
+    eval(sprintf('mex -v %s XtTimesKronSIdTimesY.c -o XtTimesKronSIdTimesY', lapack));
     checkCompile( 'XtTimesKronSIdTimesY',ext);
   end
     
