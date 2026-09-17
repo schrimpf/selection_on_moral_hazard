@@ -175,7 +175,8 @@ void mexFunction
   //mexPrintf("freed args\n");
   myFree(thrptr);
   { 
-    int verbosity = (int) mxGetScalar(mexGetVariable("global","verbosity"));
+    const mxArray *v_arr = mexGetVariable("global","verbosity");
+    int verbosity = v_arr ? (int) mxGetScalar(v_arr) : 0;
     if (verbosity>0) {
       mexPrintf("samplePsi: avg tries=%g, reached max %d times, overflow %d times (%.2lf)\n",
                 ((double) tottries)/((double) N),nbad,totover,((double) totover)/((double) tottries));

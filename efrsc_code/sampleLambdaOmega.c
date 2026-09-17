@@ -246,7 +246,8 @@ void mexFunction
   myFree(targ);
   //mexPrintf("freed args\n");
   myFree(thrptr);
-  int verbosity = (int) mxGetScalar(mexGetVariable("global","verbosity"));
+  const mxArray *v_arr = mexGetVariable("global","verbosity");
+  int verbosity = v_arr ? (int) mxGetScalar(v_arr) : 0;
   if (verbosity>0) {
     mexPrintf("sampleLambdaOmega: avg tries=%g, overflowed %d times (%.2lf of tries), reached max %d times\n", \
               ((double) tries)/((double) N),totover,
