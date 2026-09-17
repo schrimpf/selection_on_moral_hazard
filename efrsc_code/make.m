@@ -7,22 +7,11 @@ function make(force)
   % so you might not need to change anything for it. If you install nlopt
   % with default options, it will be /usr/local and this will work. 
   local = '/usr/local';
-  Lib = ['-L' local '/lib'];     % add to linktime library path
-  Inc = ['-I' local '/include']; % add into include path
-  linkLib = ['''-Wl,-rpath,' local '/lib''']; % add to runtime library path 
+  Lib = ['-L' local '/lib -L/usr/lib'];     % add to linktime library path
+  Inc = ['-I' local '/include -I/usr/include']; % add into include path
+  linkLib = ['']; % runtime library path (standard paths in ld.so.cache)
 
   % options needed to link to lapack with standard fortran interface 
-  % you will need to modify this to fit your system and preferred
-  % version of lapack. You can use the version of lapack included with matlab
-  % or octave. Here we use AMD's math core library, but it makes little
-  % difference. For octave, it is likely that -llapack suffices, for matlab
-  % -lmwlapack likely would work. Note that with these libraries, you should
-  % change chol.c and sampleMu.c to use the fortran interface to lapack (see
-  % comments in those files)
-  lapack = ['-L/opt/acml5.1.0/gfortran64_fma4_mp/lib -lacml_mp ' ...
-            '''-Wl,-rpath=/opt/acml5.1.0/gfortran64_fma4_mp/lib'' ' ...
-            '-lgfortran ' ... 
-            '-I/opt/acml5.1.0/gfortran64_fma4_mp/include'];
   lapack = '-llapack';
   if (~isOctave)  % Matlab gets its compilation options from mexopts.sh, not
                   % environmental variables directly, so write a version of
@@ -82,17 +71,22 @@ function make(force)
     checkCompile('alcoa','.o');
   end
   
-  if (~exist('arms','dir')) % try to download Adaptive Rejection Metropolis
-                            % Sampling (ARMS)
-    [dl txt] = system(['wget http://www1.maths.leeds.ac.uk/~wally.gilks/' ...
-                       'adaptive.rejection/arms.method/arms_method.zip']) 
-    fprintf('%s\n',txt);
-    if (dl~=0) 
-      fprintf(['ERROR: failed to download ARMS. Perhaps the link is ' ...
-               'dead.\n']);
-      exit(dl);
+  if (~exist('arms/arms.c','file')) 
+    if (exist('arms_method.zip','file'))
+      [zip txt] = system('unzip arms_method.zip -d arms');
+    elseif (exist('../arms/arms_method.zip','file'))
+      [zip txt] = system('unzip ../arms/arms_method.zip -d arms');
+    else
+      [dl txt] = system(['wget http://www1.maths.leeds.ac.uk/~wally.gilks/' ...
+                         'adaptive.rejection/arms.method/arms_method.zip']);
+      fprintf('%s\n',txt);
+      if (dl~=0) 
+        fprintf(['ERROR: failed to download ARMS. Perhaps the link is ' ...
+                 'dead.\n']);
+        exit(dl);
+      end
+      [zip txt] = system('unzip arms_method.zip -d arms');
     end
-    [zip txt]=system('unzip arms_method.zip -d arms');
   end
   
       

@@ -1,9 +1,11 @@
-clear; close all;
+close all;
+path(path,'..');
 config;
 load(resultFile);
 nSim = data.N*10;
 seed = 1337; %sum(100*clock);
 setSeed(seed);
+clear options;
 options.cf = true;
 options.nosel = true;
 options.sampleAll=true;

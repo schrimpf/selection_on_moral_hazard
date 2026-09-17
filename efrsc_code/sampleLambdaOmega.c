@@ -1,6 +1,6 @@
-/* 
+/*
    Mex-function to sample lambda and omega
-   
+
    to compile: make.m
 */
 
@@ -13,7 +13,7 @@
 
 /* Declaration of Function that computes indirect utility and spending */
 int sampleLambdaOmega
-(double *logomega, double *loglambda, const double muO, const double sigO, 
+(double *logomega, double *loglambda, const double muO, const double sigO,
  const double *muL, const double sigL,  const double psi,
  const double *xint, const double *wint, const int nint,
  const double *deduct, const double *maxoop, const double *prem, const int nplan,
@@ -27,7 +27,7 @@ struct u0parm {
 static RANDSTATE rstate[MAXTHREADS];
 static int rsInit=0;
 
-int utils(double *u, double lam, double om, double ded, double max, double co) 
+int utils(double *u, double lam, double om, double ded, double max, double co)
 {
   double m, oop;
   double maxu;
@@ -47,7 +47,7 @@ int utils(double *u, double lam, double om, double ded, double max, double co)
   m = lam+(1-co)*om;
   oop = ded + co*(m - ded);
   if (m<ded || oop>max)
-    u[2] = -1e300; 
+    u[2] = -1e300;
   else   {
     u[2] = utilfn(m,lam,om,oop,multMH);
     if (u[2]>maxu) {
@@ -55,10 +55,10 @@ int utils(double *u, double lam, double om, double ded, double max, double co)
       seg = 2;
     }
   }
-  m = lam+om;  
+  m = lam+om;
   if (max>ded+co*(m-ded) || m<0) u[3] = -1e300;
   else {
-    u[3] = utilfn(m,lam,om,max,multMH);  
+    u[3] = utilfn(m,lam,om,max,multMH);
     if (u[3]>maxu) {
       maxu = u[3];
       seg = 3;
@@ -74,8 +74,11 @@ double logDensity(double logo,void *udata) {
   for(t=0;t<d->T;t++) {
     if (d->useS[t]==3) {
       double logl = d->spend[t]-exp(logo)+d->lamlo;
-      if (logl<0) logl = 0;
-      logl = log(logl);
+      if (logl<0) {
+        return(-HUGE_VAL);
+      } else {
+        logl = log(logl);
+      }
       logd += -.5*(logl-d->muL[t])*(logl-d->muL[t])/(d->sigL*d->sigL) - logl;
     }
     else if (d->useS[t]==2) {
@@ -110,12 +113,12 @@ struct sampleArgs {
   double *lamlo;
 
   double *stdevi;
-  
-  int nint; 
+
+  int nint;
   int maxIter;
   int T; /* number of time periods */
   int np;
-  
+
   int tries;
   int totover;
   /* output */
@@ -127,23 +130,23 @@ struct sampleArgs {
   int end;
 };
 
-void *sampleLO(void *voidptr) 
-{  
+void *sampleLO(void *voidptr)
+{
   struct sampleArgs *sa = (struct sampleArgs*) voidptr;
   int i;
   sa->tries=0;
   sa->totover=0;
   for(i=sa->start;i<sa->end;i++) {
-    int t; 
+    int t;
     int nover = 0;
     double so = sa->nsigO>1? sa->sigO[i]:sa->sigO[0];
     sa->nbad += sampleLambdaOmega(sa->logo+i,sa->logl+i*sa->T,sa->muO[i],so*sa->stdevi[i],
                                   sa->muL+i*sa->T,
                                   sa->sigL[i]*sa->stdevi[i],
-                                  sa->psi[i], 
-                                  sa->xint,sa->wint,sa->nint, 
+                                  sa->psi[i],
+                                  sa->xint,sa->wint,sa->nint,
                                   sa->deduct+i*sa->np*sa->T,sa->maxoop+i*sa->np*sa->T,sa->prem+i*sa->np*sa->T,
-                                  sa->np,sa->choice+i*sa->T, sa->spend+i*sa->T, sa->T, 
+                                  sa->np,sa->choice+i*sa->T, sa->spend+i*sa->T, sa->T,
                                   sa->maxIter, sa->logOmegaHi,&t, &nover, rstate+sa->tid, sa->lamlo[i]);
     sa->tries+=t;
     sa->totover+=nover;
@@ -176,12 +179,12 @@ void mexFunction
   sarg.logomega = mxGetPr(prhs[0]);
   sarg.loglambda = mxGetPr(prhs[1]);
   sarg.muO = mxGetPr(prhs[2]);
-  sarg.sigO = mxGetPr(prhs[3]); 
+  sarg.sigO = mxGetPr(prhs[3]);
   sarg.nsigO = mxGetNumberOfElements(prhs[3]);
   sarg.muL = mxGetPr(prhs[4]);
   sarg.sigL = mxGetPr(prhs[5]);
   sarg.psi = mxGetPr(prhs[6]);
-                
+
   sarg.nint = mxGetNumberOfElements(prhs[7]);
   sarg.xint = mxGetPr(prhs[7]);
   sarg.wint = mxGetPr(prhs[8]);
@@ -215,7 +218,7 @@ void mexFunction
   sarg.logl = mxGetPr(plhs[1]);
   if (nlhs>2) {
     plhs[2] = mxCreateDoubleMatrix(1,1,mxREAL);
-    nbad = mxGetPr(plhs[1]);
+    nbad = mxGetPr(plhs[2]);
     *(nbad) = 0;
   } else {
     if (NULL==(nbad = myCalloc(1,sizeof(double)))) mexErrMsgTxt("Allocation failure");
@@ -229,11 +232,11 @@ void mexFunction
     targ[i].tid = i;
     targ[i].start = i*N/nthread;
     if (i<nthread-1) targ[i].end = (i+1)*N/nthread;
-    else targ[i].end = N;       
-    pthread_create(thrptr+i,NULL, sampleLO, (void *) (targ+i)); 
+    else targ[i].end = N;
+    pthread_create(thrptr+i,NULL, sampleLO, (void *) (targ+i));
   }
   for (i=0;i<nthread;i++) {
-    void *status; 
+    void *status;
     pthread_join(thrptr[i],&status);
     tries += targ[i].tries;
     totover += targ[i].totover;
@@ -249,13 +252,13 @@ void mexFunction
               ((double) tries)/((double) N),totover,
               ((double) totover)/(1e-300+(double) tries) , (int) nbad[0]);
   }
-  if (nlhs<=2) myFree(nbad);  
+  if (nlhs<=2) myFree(nbad);
 }
-  
+
 
 #define copay 0.1
 int sampleLambdaOmega
-(double *logomega, double *loglambda, const double muO, const double sigO, 
+(double *logomega, double *loglambda, const double muO, const double sigO,
  const double *muL, const double sigL,  const double psi,
  const double *xint, const double *wint, const int nint,
  const double *deduct, const double *maxoop, const double *prem, const int nplan,
@@ -267,7 +270,7 @@ int sampleLambdaOmega
   struct u0parm upm;
   int t;
   double *logl = myCalloc(T,sizeof(double));
-  double logo = *logomega;  
+  double logo = *logomega;
   int nsamp = 5;
   double usamp[5];
   int s=nsamp+1;
@@ -277,7 +280,7 @@ int sampleLambdaOmega
   int ninit = 20;
   int mhA = 0;
   int mhT = 0;
-  
+
   upm.spend = spend;
   upm.T = T;
   upm.c = copay;
@@ -291,7 +294,7 @@ int sampleLambdaOmega
     if (choice[t]>0) {
       int k = ((int) choice[t])-1+t*nplan;
       if (spend[t]>0 && spend[t]<deduct[k]) upm.useS[t] = 1;
-      else if (spend[t]>=deduct[k] && 
+      else if (spend[t]>=deduct[k] &&
                spend[t]<deduct[k] + (maxoop[k] - deduct[k])/copay &&
                spend[t]>0)  {
         upm.useS[t] = 2;
@@ -304,29 +307,29 @@ int sampleLambdaOmega
       else upm.useS[t] = 0;
     } else upm.useS[t] = 0;
   }
-  
+
   if (logo>lohi) mexPrintf("crap %g %g\n",logo,lohi);
-  
+
   (*tries)=0;
   //for (t=0;t<ninit;t++) xinit[t] = muO + sigO*6*((double) t-nint/2)/((double) nint);
   while (!accept) {
     double lo=muO-9*sigO;
-    double hi=muO+9*sigO; // (inf) 
+    double hi=muO+9*sigO; // (inf)
     double convex = 5;
     double s2;
     double om;
-    int neval;      
+    int neval;
     int out;
     accept=1;
-    // do five M-H steps    
+    // do five M-H steps
     s2 = logDensity(logo,&upm);
-    //if (!isfinite(s2)) mexPrintf("s2 is not finite\n"); 
+    //if (!isfinite(s2)) mexPrintf("s2 is not finite\n");
     for(t=0;t<5;t++) {
       double lonew;
       double pnew;
       double u = Sample_Uniform(0,1,rs);
-      if (isfinite(lohi)) lonew = Sample_Truncated_Normal(upm.muO,upm.sigO*upm.sigO,lohi,0,rs); 
-      else lonew = Sample_Normal(upm.muO,upm.sigO*upm.sigO,rs); 
+      if (isfinite(lohi)) lonew = Sample_Truncated_Normal(upm.muO,upm.sigO*upm.sigO,lohi,0,rs);
+      else lonew = Sample_Normal(upm.muO,upm.sigO*upm.sigO,rs);
       pnew = logDensity(lonew,&upm);
       if (u<exp(pnew - s2)) {
         logo = lonew;
@@ -335,21 +338,21 @@ int sampleLambdaOmega
       }
       mhT++;
     }
-    
+
     //mexPrintf("old=%g sample=%g\n",*logomega,logo);
     //logo = Sample_Normal(muO,sigO*sigO);
-    om = exp(logo);    
+    om = exp(logo);
     for(t=0;t<T;t++) {
       int k = ((int) choice[t])-1+t*nplan;
       double lam;
       double u[4];
       if (choice[t]<=0) {
         logl[t] = Sample_Normal(muL[t],sigL*sigL,rs);
-        continue; // person missing this period      
+        continue; // person missing this period
       }
       if (spend[t]<=0) {
         logl[t] = Sample_Normal(muL[t],sigL*sigL,rs);
-        lam = exp(logl[t]) - lamlo;        
+        lam = exp(logl[t]) - lamlo;
         accept = accept && 0==utils(u, lam,om, deduct[k], maxoop[k], copay);
         if (!accept) reason[0]++;
       } else if (upm.useS[t]==1) {
@@ -370,16 +373,16 @@ int sampleLambdaOmega
         logl[t] = log(lam+lamlo);
         accept = accept && 3==utils(u, lam,om, deduct[k], maxoop[k], copay);
         if (!accept) reason[3]++;
-      }      
+      }
       if (accept) {
         double exv[5],exo[5];
-        int newChoice=choiceFnEx(om,psi,muL[t],sigL, 
+        int newChoice=choiceFnEx(om,psi,muL[t],sigL,
                                  xint, wint,nint,
-                                 deduct+t*nplan, maxoop+t*nplan, 
+                                 deduct+t*nplan, maxoop+t*nplan,
                                  prem+t*nplan, nplan,copay,-lamlo,0,
                                  exv,exv,exo);
         if (newChoice==0) {
-          accept = 0; 
+          accept = 0;
           (*noverflow)++;
         } else {
           accept = accept && ((int) choice[t])== newChoice;
@@ -387,7 +390,7 @@ int sampleLambdaOmega
         //accept=1;
         if (!accept) reason[4]++;
       }
-      if (!accept) break;        
+      if (!accept) break;
     }
     (*tries)++;
     if (*tries>maxIter) {
@@ -413,9 +416,9 @@ int sampleLambdaOmega
     if (reason[4]>maxIter/2) {
       int t, J;
       for(t=0;t<T;t++) {
-        int J = choiceFn(exp(*logomega),psi,muL[t],sigL, 
+        int J = choiceFn(exp(*logomega),psi,muL[t],sigL,
                          xint, wint,nint,
-                         deduct+t*nplan, maxoop+t*nplan, 
+                         deduct+t*nplan, maxoop+t*nplan,
                          prem+t*nplan, nplan,copay);
           mexPrintf("t=%d choice=%d J=%d nplan=%d\n",t,((int) choice[t]),J,nplan);
       }

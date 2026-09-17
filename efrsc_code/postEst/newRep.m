@@ -1,4 +1,4 @@
-clear; close all;
+close all;
 config;
 path(path,'..');
 load(resultFile);
@@ -7,6 +7,7 @@ nSim = data.N*10;
 seed = 1337; %sum(100*clock);
 setSeed(seed);
 
+clear options;
 options.cf = true;
 options.nosel = false;
 options.sampleAll=true;
@@ -48,7 +49,9 @@ simdata=simulate(nSim,data,beta,Sigma,gamma,rho,shape,theta,bll,sigll,alpha,opti
 
 %% spending stats and densities
 nbin = 64;
-path(path,'kde');
+if exist('kde', 'dir')
+  path(path,'kde');
+end
 maxs = max(log(data.totalSpend(:)+1));
 select = squeeze(data.avail(4,:,:)==1);
 subset =  ~select(:) & ~isnan(data.totalSpend(:));
@@ -274,10 +277,12 @@ fprintf(out,'& %.2f ',tau);
 fprintf(out,' & Mean$\\vert$choose 1 \\\\ \\hline \n');
 y = ds(~isnan(ds));
 fprintf(out,' 5-1 '); 
-fprintf(out,' & %.0f ',[mean(y) std(y) quantile(y',tau)' mean(ds(b15data.choice(2,:)==1))]);
+q_tau = quantile(y(:), tau);
+fprintf(out,' & %.0f ',[mean(y) std(y) q_tau(:)' mean(ds(b15data.choice(2,:)==1))]);
 fprintf(out,' \\\\ \n Full-No ');
 y = dsFN(~isnan(dsFN));
-fprintf(out,' & %.0f ',[mean(y) std(y) quantile(y',tau)' mean(dsFN(b15data.choice(2,:)==1))]);
+q_tau = quantile(y(:), tau);
+fprintf(out,' & %.0f ',[mean(y) std(y) q_tau(:)' mean(dsFN(b15data.choice(2,:)==1))]);
 fprintf(out, ' \\\\ \n');
 fclose(out);
 

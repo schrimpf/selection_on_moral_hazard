@@ -45,15 +45,18 @@ function [fy q bx]=conditionalFoo(x,y,foo,nq, bw)
   q = b-1/(2*nq);
   if (nargin<5 || bw<=0)
     b1x = quantile(x,b);
+    b1x = b1x(:);
     b0x = [-Inf; b1x(1:end-1)];    
   else
-    b1x=quantile(x,min(q+bw/2,1));
-    b0x=quantile(x,max(q-bw/2,0));    
+    b1x = quantile(x,min(q+bw/2,1));
+    b1x = b1x(:);
+    b0x = quantile(x,max(q-bw/2,0));    
+    b0x = b0x(:);
   end
   % brackets around each quantile
   fy = zeros(size(q));
   for j=1:numel(q)
     fy(j) = foo(y(x>b0x(j) & x<=b1x(j)));
   end
-  bx = [b0x; b1x(end)];
+  bx = [b0x(:); b1x(end)];
 end

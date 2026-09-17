@@ -217,8 +217,8 @@ void mexFunction
   /* Create and get outputs */
   plhs[0] = mxCreateDoubleMatrix(T,N,mxREAL);
   if (nlhs>1) {
-    int dims[3];
-    dims[0] = np;;
+    mwSize dims[3];
+    dims[0] = np;
     dims[1] = T;
     dims[2] = N;
     plhs[1] = mxCreateNumericArray(3,dims,mxDOUBLE_CLASS,mxREAL);

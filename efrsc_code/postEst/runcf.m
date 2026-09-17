@@ -1,5 +1,7 @@
 config;
-force = false;
+if ~exist('force', 'var')
+  force = false;
+end
 path(path,'..');
 
 %% create output folders if needed
@@ -10,10 +12,23 @@ for i=1:numel(folders)
   end
 end
 
-% run counterfactuals that haven't been run since resultFile last changed
-resInfo = dir([resultFile '.mat']);
-check = dir(sprintf('tex/tables/%sParmP.tex',prefix));
-if isempty(check) || check.datenum<resInfo.datenum || force
+% helper function to check if target needs rebuild
+function need = needsRun(targetFile, resFile, force)
+  if force, need = true; return; end
+  targetInfo = dir(targetFile);
+  if isempty(targetInfo), need = true; return; end
+  rInfo = dir(resFile);
+  if isempty(rInfo)
+    rInfo = dir(['../' resFile]);
+  end
+  if isempty(rInfo)
+    need = false;
+  else
+    need = (targetInfo(1).datenum < rInfo(1).datenum);
+  end
+end
+
+if needsRun(sprintf('tex/tables/%sParmP.tex',prefix), [resultFile '.mat'], force)
   fprintf(['\n############################################################' ...
            '####################\n' ...
            'RUNING PAPERTABLES\n']);
@@ -21,28 +36,22 @@ if isempty(check) || check.datenum<resInfo.datenum || force
   paperTablesCSV;
 end
 
-resInfo = dir([resultFile '.mat']);
-check = dir(sprintf('csv/%sselectMH.csv',prefix));
-if isempty(check) || check.datenum<resInfo.datenum || force
+if needsRun(sprintf('csv/%sselectMH.csv',prefix), [resultFile '.mat'], force)
   fprintf(['\n############################################################' ...
            '####################\n' ...
            'RUNING P10PLOT\n']);
   p10plot;
 end
 
-
 %fitReport;
-resInfo = dir([resultFile '.mat']);
-check = dir(sprintf('tex/tables/%sds.csv',prefix));
-if isempty(check) || check.datenum<resInfo.datenum || force
+if needsRun(sprintf('tex/tables/%sds.csv',prefix), [resultFile '.mat'], force)
   fprintf(['\n############################################################' ...
            '####################\n' ...
            'RUNING NEWREP\n']);
   newRep;
 end
-resInfo = dir([resultFile '.mat']);
-check = dir(sprintf('tex/tables/%sWelfareP.csv',prefix));
-if isempty(check) || check.datenum<resInfo.datenum || force
+
+if needsRun(sprintf('tex/tables/%sWelfareP.csv',prefix), [resultFile '.mat'], force)
   fprintf(['\n############################################################' ...
            '####################\n' ...
            'RUNING WELFARE\n']);

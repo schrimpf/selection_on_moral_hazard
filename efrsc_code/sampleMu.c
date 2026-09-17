@@ -1,6 +1,6 @@
-/* 
+/*
    Mex-function to sample omega and lambda
-   
+
    to compile: use make.m
 */
 
@@ -51,12 +51,12 @@ struct sampleArgs {
   double *stdevi;
   double *meanMuL;
 
-  int nint; 
+  int nint;
   int maxIter;
   int T; /* number of time periods */
   int np;
   int multMH;
-  
+
   int tries;
   int totover;
   /* output */
@@ -69,13 +69,13 @@ struct sampleArgs {
 };
 
 
-void *sampleMu(void *voidptr) 
+void *sampleMu(void *voidptr)
 {
   double *Vi,*Ci;
   struct sampleArgs *sa = (struct sampleArgs*) voidptr;
   int i;
-  Vi = myCalloc((2+sa->T)*(2+sa->T),sizeof(double));  
-  Ci = myCalloc((2+sa->T),sizeof(double));  
+  Vi = myCalloc((2+sa->T)*(2+sa->T),sizeof(double));
+  Ci = myCalloc((2+sa->T),sizeof(double));
   sa->tries=0;
   sa->totover=0;
   sa->nbad=0;
@@ -86,17 +86,17 @@ void *sampleMu(void *voidptr)
     int Tp2 = sa->T+2;
     double *Sig = sa->nSig==1? sa->Sig:(sa->Sig+i*Tp2*Tp2);
     for(t=0;t<sa->T;t++) {
-      int accept = 0;      
-      double sig2mul;      
+      int accept = 0;
+      double sig2mul;
       double meanmul;
       int t1,t2,j1,j2;
       char uplo = 'U';
       int info,N=Tp2;
       // create V_{i,-t} -- first Sig_{-t}
-      for(j1=0,t1=0;t1<(Tp2);t1++) {       
+      for(j1=0,t1=0;t1<(Tp2);t1++) {
         for(j2=0,t2=0;t2<(Tp2);t2++) {
           if (t1!=(2+t) && t2!=(t+2)) {
-            Vi[j1*(Tp2) + j2] = Sig[t1*(Tp2)+t2]; 
+            Vi[j1*(Tp2) + j2] = Sig[t1*(Tp2)+t2];
             j2++;
           }
         }
@@ -135,7 +135,7 @@ void *sampleMu(void *voidptr)
       }
       */
       // use lapack  to compute inv(V_i)
-      //dpotrf(uplo,N,Vi,N,&info); // Vi = cholesky decomp(Vi)      
+      //dpotrf(uplo,N,Vi,N,&info); // Vi = cholesky decomp(Vi)
       // or call fortran version directly
       dpotrf_(&uplo,&N,Vi,&N,&info,1);
 
@@ -151,7 +151,7 @@ void *sampleMu(void *voidptr)
       }
       */
       //dpotri(uplo,N,Vi,N,&info); // Vi = inv(Vi) (upper triangle)
-      dpotri_(&uplo,&N,Vi,&N,&info,1); 
+      dpotri_(&uplo,&N,Vi,&N,&info,1);
       // fill in lower triangle
       for(j1=0;j1<Tp2;j1++) {
         for(j2=0;j2<j1;j2++) Vi[j1 + Tp2*j2] = Vi[j2 + Tp2*j1];
@@ -171,27 +171,28 @@ void *sampleMu(void *voidptr)
       //if (sa->tid==0) mexPrintf("sig2mul=%g, info=%d\n",sig2mul,info);
       meanmul  = sa->xbL[i*sa->T+t];
       for(j1=0;j1<Tp2;j1++) {
-        meanmul += Ci[j1]*Vi[0 + Tp2*j1]*(sa->logomega[i]-sa->xbO[i]) + 
+        meanmul += Ci[j1]*Vi[0 + Tp2*j1]*(sa->logomega[i]-sa->xbO[i]) +
           Ci[j1]*Vi[1 + Tp2*j1]*(sa->logpsi[i]-sa->xbP[i]);
         for(j2=2,t1=0;t1<sa->T;t1++) {
           if (t1!=t) meanmul += Ci[j1]*Vi[j2++ + Tp2*j1]*(sa->muLout[i*sa->T+t1]-sa->xbL[i*sa->T+t1]);
-        }          
+        }
         meanmul += Ci[j1]*Vi[Tp2-1+Tp2*j1]*(sa->loglambda[i*sa->T+t]-sa->xbL[i*sa->T+t]);
         for(j2=0;j2<Tp2;j2++) {
           sig2mul -= Ci[j1]*Vi[j1*Tp2+j2]*Ci[j2];
           //if (sa->tid==0) mexPrintf("sig2mul=%g j1=%d j2=%d\n",sig2mul,j1,j2);
         }
-      }      
+      }
       //if (sa->tid==0 && i<10) mexPrintf("%d: meanmul=%g sig2mul=%g\n",i,meanmul,sig2mul);
+      tries = 0;
       while (!accept) {
         accept = 1;
         ml = Sample_Normal(meanmul,sig2mul*sa->stdevi[i]*sa->stdevi[i],
-                           &rs[sa->tid]); 
+                           &rs[sa->tid]);
         if (sa->choice[t+i*sa->T]>=0) {
           double exv[5];
           int J = choiceFnEx(exp(sa->logomega[i]),exp(sa->logpsi[i]), ml, sa->sigL[i],sa->xint, sa->wint,sa->nint,
-                             sa->deduct+t*sa->np+i*sa->T*sa->np, sa->maxoop+t*sa->np+i*sa->T*sa->np, 
-                             sa->prem+t*sa->np+i*sa->T*sa->np, sa->np, copay,-sa->lamlo[i], sa->multMH, 
+                             sa->deduct+t*sa->np+i*sa->T*sa->np, sa->maxoop+t*sa->np+i*sa->T*sa->np,
+                             sa->prem+t*sa->np+i*sa->T*sa->np, sa->np, copay,-sa->lamlo[i], sa->multMH,
                              exv,exv,exv);
           sa->totover += (J==0);
           accept = (((int) sa->choice[t+i*sa->T])== J);
@@ -206,7 +207,7 @@ void *sampleMu(void *voidptr)
       sa->tries+= tries;
       if (tries<=sa->maxIter) {
         sa->muLout[i*sa->T+t] = ml;
-      }     
+      }
     } // end t
     //mexPrintf("%4d: %5.3g %5.3g\n      %5.3g %5.3g\n",i,rpm[0+i*4],rpm[1+i*4],rpm[2+i*4],rpm[3+i*4]);
     //mexPrintf("%4d: %d\n",
@@ -242,14 +243,14 @@ void mexFunction
   sa.xbL = mxGetPr(prhs[6]);
   sa.sigL = mxGetPr(prhs[7]);
   sa.Sig = mxGetPr(prhs[8]);
-  sa.nSig = mxGetNumberOfElements(prhs[8]);              
-  
+  sa.nSig = mxGetNumberOfElements(prhs[8]);
+
   sa.nint = mxGetNumberOfElements(prhs[9]);
   sa.xint = mxGetPr(prhs[9]);
   sa.wint = mxGetPr(prhs[10]);
   sa.np = mxGetDimensions(prhs[11])[0];
   sa.T = mxGetDimensions(prhs[11])[1];
-  sa.nSig /= ((sa.T+2)*(sa.T+2));  
+  sa.nSig /= ((sa.T+2)*(sa.T+2));
   N = mxGetDimensions(prhs[11])[2];
   sa.deduct = mxGetPr(prhs[11]);
   sa.maxoop = mxGetPr(prhs[12]);
@@ -269,7 +270,7 @@ void mexFunction
   if (rsInit==0) {
     for (i=0;i<MAXTHREADS;i++) set_time_seed(rs+i);
     rsInit=1;
-  }  
+  }
   plhs[0] = mxCreateDoubleMatrix(sa.T,N,mxREAL);
   sa.muLout = mxGetPr(plhs[0]);
   memcpy(sa.muLout,sa.muL,sizeof(double)*N*sa.T);
@@ -280,11 +281,11 @@ void mexFunction
     ta[i].tid = i;
     ta[i].start = i*N/nthread;
     if (i<nthread-1) ta[i].end = (i+1)*N/nthread;
-    else ta[i].end = N;       
-    pthread_create(thrptr+i,NULL, sampleMu, (void *) (ta+i)); 
+    else ta[i].end = N;
+    pthread_create(thrptr+i,NULL, sampleMu, (void *) (ta+i));
   }
   for (i=0;i<nthread;i++) {
-    void *status; 
+    void *status;
     pthread_join(thrptr[i],&status);
     tottries += ta[i].tries;
     totover += ta[i].totover;
@@ -301,4 +302,3 @@ void mexFunction
   }
   return;
 }
-

@@ -6,64 +6,73 @@ else
 end
 
 global verbosity;
-verbosity  = 2; % controls amount of output (0 = some, 1 =
+verbosity  = 0; % controls amount of output (0 = some, 1 =
                 % more, 2 = most)
 
-%% set initial values -- uses past results
-load rsq01.mat; % past results
+%% set initial values -- uses past results if present, otherwise default
 prefix = 'mainSpec'; % prefix to attach to output files
-
-% compute posterior means
-nSaved = numel(chain.theta);
-post = floor(nSaved/2):nSaved;
-for k=1:numel(chain.beta);
-  beta{k} = mean(chain.beta{k}(post,:),1)';
+if exist('rsq01.mat','file')
+  load rsq01.mat; % past results
+  % compute posterior means
+  nSaved = numel(chain.theta);
+  post = floor(nSaved/2):nSaved;
+  for k=1:numel(chain.beta)
+    beta{k} = mean(chain.beta{k}(post,:),1)';
+  end
+  Sigma = squeeze(mean(chain.sig(post,:,:),1));
+  gamma = squeeze(mean(chain.gamma(post,:,:),1));
+  theta = squeeze(mean(chain.theta(post)));
+  shape = squeeze(mean(chain.shape(post)));
+  rho = squeeze(mean(chain.rho(post)));
+  bll = [mean(chain.bll(post,:),1)'];
+  sigll = mean(chain.sigll(post));
+  Sigma = combineSigOPbeta(Sigma(1:2,1:2),gamma,rho,2);
+  clear data chain;
+else
+  fprintf('No rsq01.mat found, using default initial values.\n');
+  beta{1} = zeros(14,1); beta{1}(1) = log(1000);
+  beta{2} = zeros(14,1); beta{2}(1) = -4;
+  beta{3} = zeros(15,1); beta{3}(1) = 6;
+  gamma = [0.1; 0.1; 0.8];
+  rho = 0.5;
+  theta = 1.0;
+  shape = 2.0;
+  bll = zeros(14,1); bll(1) = 50;
+  sigll = 10;
+  Sigma = combineSigOPbeta(0.5*eye(2),gamma,rho,2);
 end
-%beta{1} = [beta{1}; 0; 0; 0];
-%beta{2} = [beta{2}; 0; 0; 0];
-Sigma = squeeze(mean(chain.sig(post,:,:),1));
-gamma = squeeze(mean(chain.gamma(post,:,:),1));
-theta = squeeze(mean(chain.theta(post)));
-shape = squeeze(mean(chain.shape(post)));
-rho = squeeze(mean(chain.rho(post)));
-bll = [mean(chain.bll(post,:),1)'];
-sigll = mean(chain.sigll(post));
-Sigma = combineSigOPbeta(Sigma(1:2,1:2),gamma,rho,2);
 logOmHi = Inf;
 varHi = 10;
-clear data chain;
 
 %% Load data and set options
-make; % compiles *.c into *.mex files if necessary, you will likely need to
-      % modify make.m depending on your system
+make; % compiles *.c into *.mex files if necessary
+
 lx{1} = [32:37 40 42 43 44 52 53 54];
 lx{2} = lx{1}; lx{3} = lx{1};
 lxll = lx{1}; lxhs = lx{1};
-data = loadData('al.csv',true,2004,lx,lxll,lxhs);
+if exist('al.csv','file')
+  dataFile = 'al.csv';
+else
+  dataFile = '../al.csv';
+end
+data = loadData(dataFile,true,2004,lx,lxll,lxhs);
 data.varLo = 0; % lowest sigma_lambda allowed
 data.varHi = 4*var(log(1+data.totalSpend(~isnan(data.totalSpend)))); % highest sigma_lambda
 data.logOmegaHi = Inf; % highest log omega
 data.lamloHi = 3000; % highest kappa
 
-
 %% create output file with unique name
-nameroot=prefix
-filename='';
-files=dir(sprintf('%s*mat',nameroot));
-if (numel(files)==0)
-  filename = sprintf('%s01.mat',nameroot);
-else 
-  mynum = 0;
-  for n=1:numel(files)
-    j = sscanf(files(n).name,[nameroot '%2d'],1);
-    if (j>mynum && files(n).bytes>0)
-      mynum = j;
-    end
+nameroot = prefix;
+filename = '';
+files = dir(sprintf('%s*mat',nameroot));
+mynum = 0;
+for n=1:numel(files)
+  j = sscanf(files(n).name,[nameroot '%2d'],1);
+  if (~isempty(j) && j>mynum && files(n).bytes>0)
+    mynum = j;
   end
-  j = j+1;
-  filename = sprintf('%s%02d.mat',nameroot,j);
 end
-system(sprintf('touch %s',filename));
+filename = sprintf('%s%02d.mat',nameroot,mynum+1);
 
 %% drop select
 % sel = squeeze(data.avail(5,2,:)==1);
@@ -114,9 +123,9 @@ alpha = zeros(size(data.xhs,2),1);
 %   end
 % end
 
-data = dropBad(data, ((1:data.N)>200)'); % use small dataset for debugging
+% data = dropBad(data, ((1:data.N)>200)'); % uncomment to use small dataset for debugging
 
-%% run mcmc 
+%% run mcmc
 [chain data]=gibbs(data, beta, Sigma, gamma, rho, theta, shape, bll,sigll,alpha,options);
 
 % save results

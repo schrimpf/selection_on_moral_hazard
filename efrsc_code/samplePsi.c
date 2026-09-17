@@ -96,7 +96,7 @@ void *sampleP(void *voidptr)
     //mexPrintf("%4d: %5.3g %5.3g\n      %5.3g %5.3g\n",i,rpm[0+i*4],rpm[1+i*4],rpm[2+i*4],rpm[3+i*4]);
     //mexPrintf("%4d: %d\n",
   }
-  return;
+  return NULL;
 }
 
 void mexFunction

@@ -609,7 +609,7 @@ function beps = sampleGammaEps(e, bop, rho, data)
   n = size(e,1);
   y = reshape(e(:,lmu),data.T*data.N,1);
   x = repmat(e(:,lop),data.T,1);
-  beps = 1/sqrt(gamrnd(n*data.T/2, 2/((1-rho^2)*sum((y - x*bop').^2)) ));
+  beps = 1/sqrt(gamrnd(n*data.T/2, 2/((1-rho^2)*sum((y - x*bop(:)).^2)) ));
 end
 
 %% Sample rho -- assuming diffuse prior
@@ -618,7 +618,7 @@ function rho = sampleRho(e,gamma,rho,data)
   lmu = 3:(2+T);
   lop = 1:2;
   n = size(e,1);
-  epsi = (e(:,lmu) - (e(:,lop)*gamma(1:2)')*ones(1,T))/gamma(3);
+  epsi = (e(:,lmu) - (e(:,lop)*gamma(1:2)(:))*ones(1,T))/gamma(3);
   %   eem1 = sum(sum(epsi(:,2:T).*epsi(:,1:(T-1))));
   %   em1sq = sum(sum(epsi(:,1:(T-1)).^2));
   %   e1sq = sum(epsi(:,1).^2);

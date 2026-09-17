@@ -1,5 +1,4 @@
 %% creates tables in march 2011 version of paper
-clear;
 path(path,'..');
 config;
 load(resultFile);
@@ -44,6 +43,7 @@ else
 end
 xnames{2} = xnames{1};
 xnames{3} = xnames{1};
+clear options;
 options.sampleAll = true;
 options.multMH = false;
 tic

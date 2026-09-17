@@ -91,6 +91,7 @@ void *sampleSigL(void *voidptr)
     }
     sa->tottries += tries;
   }    
+  return NULL;
 }
 
 void mexFunction
