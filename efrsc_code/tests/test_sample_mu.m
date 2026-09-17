@@ -14,6 +14,7 @@ fprintf('  Running test_sample_mu (checking conditional distribution for T=2)...
 
 if (exist('isOctave', 'file') && isOctave())
   rand('state', 12345);
+  randn('state', 12345);
 else
   rng(12345);
 end

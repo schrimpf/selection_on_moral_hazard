@@ -24,6 +24,7 @@ suites = {
   'test_latent_samplers',  @test_latent_samplers;
   'test_gibbs_pipeline',   @test_gibbs_pipeline;
   'test_sample_mu',        @test_sample_mu;
+  'test_synthetic_data',   @test_synthetic_data;
 };
 
 fprintf('\n======================================================================\n');

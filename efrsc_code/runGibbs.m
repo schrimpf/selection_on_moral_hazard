@@ -10,7 +10,7 @@ verbosity  = 0; % controls amount of output (0 = some, 1 =
                 % more, 2 = most)
 
 %% set initial values -- uses past results if present, otherwise default
-prefix = 'revisedCode'; % prefix to attach to output files
+prefix = 'synth'; % prefix to attach to output files
 if exist('rsq01.mat','file')
   load rsq01.mat; % past results
   % compute posterior means
@@ -50,11 +50,12 @@ make; % compiles *.c into *.mex files if necessary
 lx{1} = [32:37 40 42 43 44 52 53 54];
 lx{2} = lx{1}; lx{3} = lx{1};
 lxll = lx{1}; lxhs = lx{1};
-if exist('al.csv','file')
-  dataFile = 'al.csv';
-else
-  dataFile = '../al.csv';
-end
+%if exist('al.csv','file')
+%  dataFile = 'al.csv';
+%else
+%  dataFile = '../al.csv';
+%end
+dataFile = '../synthetic1x.csv';
 data = loadData(dataFile,true,2004,lx,lxll,lxhs);
 data.varLo = 0; % lowest sigma_lambda allowed
 data.varHi = 4*var(log(1+data.totalSpend(~isnan(data.totalSpend)))); % highest sigma_lambda
