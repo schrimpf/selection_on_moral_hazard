@@ -3,7 +3,8 @@ function sdata=balance15(sdata,ratio)
   sdata.avail(2:4,2,:) = 0;
   sdata.deduct(sdata.avail~=1) = -999;
   [dp p1 p5 val]= pdiff(0,sdata);
-  dprem = quantile(squeeze(val(1,2,:)-val(5,2,:))./sdata.psi,ratio);
+  diff_val = squeeze(val(1,2,:)-val(5,2,:))./sdata.psi;
+  dprem = quantile(diff_val(isfinite(diff_val)),ratio);
   [dp p1 p5 val]= pdiff(dprem,sdata);
   fprintf('p1=%g p5=%g\n',p1,p5);
   sdata.prem(1,2,:) = sdata.prem(1,2,:) + dprem;

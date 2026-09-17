@@ -183,4 +183,56 @@ catch err
   fprintf('    [FAIL] Multi-period test: %s\n', err.message);
 end
 
+%% 5. findChoicesNMH_c basic functionality and N=1 handling
+try
+  N = 1;
+  T = 1;
+  np = 3;
+  deduct = [250; 500; 1000];
+  maxoop = [1000; 2000; 3000];
+  prem   = [1200; 800; 400];
+  avail  = [1; 1; 1];
+  choice = 0;
+  spend  = 0;
+  [c_nmh, v_nmh] = findChoicesNMH_c(0, 0, 0, 0.5, 0, 0.5, 1e-4, ...
+                                    xint, wint, deduct, maxoop, prem, avail, choice, spend, 10);
+  assert(c_nmh == 3, sprintf('NMH choice for N=1 expected 3, got %d', c_nmh));
+  assert(size(v_nmh, 1) == np, 'NMH value dimension mismatch');
+
+  results.passed = results.passed + 1;
+  fprintf('    [PASS] findChoicesNMH_c N=1 singleton dimension support\n');
+catch err
+  results.failed = results.failed + 1;
+  results.errors{end+1} = sprintf('findChoicesNMH N=1: %s', err.message);
+  fprintf('    [FAIL] findChoicesNMH N=1: %s\n', err.message);
+end
+
+%% 6. findChoicesNMH_c MPFR fallback with excluded plan (deduct(1) = -1)
+try
+  N = 4;
+  T = 1;
+  np = 3;
+  deduct = repmat([-1; 500; 1000], [1, T, N]);
+  maxoop = repmat([1000; 2000; 3000], [1, T, N]);
+  prem   = repmat([1200; 800; 400], [1, T, N]);
+  avail  = repmat([0; 1; 1], [1, T, N]);
+  choice = zeros(T, N);
+  spend  = zeros(T, N);
+  % High psi triggers overflow into choiceFnNMHuge
+  psi = 1000 * ones(N, 1);
+  [c_huge, v_huge] = findChoicesNMH_c(zeros(N,1), zeros(N,1), zeros(N,1), 0.5, ...
+                                      zeros(T,N), 0.5*ones(N,1), psi, ...
+                                      xint, wint, deduct, maxoop, prem, avail, choice, spend, ...
+                                      10, 0, 1);
+  assert(all(c_huge == 3), 'NMHuge failed to select valid plan when plan 1 is excluded');
+  assert(all(v_huge(1,:,:) == -Inf), 'NMHuge expected -Inf for unavailable plan 1');
+
+  results.passed = results.passed + 1;
+  fprintf('    [PASS] findChoicesNMH_c MPFR with excluded plan & 18 args\n');
+catch err
+  results.failed = results.failed + 1;
+  results.errors{end+1} = sprintf('findChoicesNMH MPFR: %s', err.message);
+  fprintf('    [FAIL] findChoicesNMH MPFR: %s\n', err.message);
+end
+
 end

@@ -12,6 +12,10 @@ function dp = findcfPrice(eCost, dprem,subsidy, w)
   if (size(w,1)~=1);
     w = w';
   end
+  valid = isfinite(dprem) & isfinite(eCost(1,:)) & isfinite(eCost(2,:)) & isfinite(w);
+  dprem = dprem(valid);
+  eCost = eCost(:, valid);
+  w = w(valid);
   ec1 = @(dp) mean(eCost(1,dprem<=dp*(1-subsidy)).*w(dprem<=dp*(1-subsidy))) ...
         / mean(w(dprem<=dp*(1-subsidy)));
   ec5 = @(dp) mean(eCost(2,dprem<=dp*(1-subsidy)).*w(dprem<=dp*(1-subsidy))) ...

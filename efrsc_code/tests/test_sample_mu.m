@@ -12,6 +12,12 @@ results.errors = {};
 
 fprintf('  Running test_sample_mu (checking conditional distribution for T=2)...\n');
 
+if (exist('isOctave', 'file') && isOctave())
+  rand('state', 12345);
+else
+  rng(12345);
+end
+
 [~, xint, wint] = gqzero(12);
 xint = xint'*sqrt(2);
 wint = wint/sqrt(pi);

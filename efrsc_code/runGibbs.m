@@ -10,7 +10,7 @@ verbosity  = 0; % controls amount of output (0 = some, 1 =
                 % more, 2 = most)
 
 %% set initial values -- uses past results if present, otherwise default
-prefix = 'mainSpec'; % prefix to attach to output files
+prefix = 'revisedCode'; % prefix to attach to output files
 if exist('rsq01.mat','file')
   load rsq01.mat; % past results
   % compute posterior means

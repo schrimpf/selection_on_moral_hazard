@@ -26,7 +26,10 @@ int choiceFnNMH
   long double mev=-HUGE_VAL;
   int k;
   for(k=0;k<nplan;k++) {
-    if (deduct[k] < 0) continue;
+    if (deduct[k] < 0) {
+      exVal[k] = -HUGE_VAL;
+      continue;
+    }
     int i;
     long double ev=0;
     for(i=0;i<nint;i++) {
@@ -45,29 +48,33 @@ int choiceFnNMH
       } 
       if (m>=(deduct[k] + (maxoop[k]-deduct[k])/copay)) {
         double u0 = utilfn(m,lambda,omega,maxoop[k],multMH);
-        if (u0>util) util = u0;;
+        if (u0>util) util = u0;
       }       
       //mexPrintf("util[%2d] = %6.3g\n",i,util);
       ev += wint[i]*expl(-psi*util);
       if (!isfinite(ev)) {
-        mexPrintf("WARNING(choiceFnNMH): overflow, switching to choiceFnHuge\n");
+        //mexPrintf("WARNING(choiceFnNMH): overflow, switching to choiceFnNMHuge\n");
         return(choiceFnNMHuge(omega,  psi,  muL,  sigL,  xint,  wint, nint,
                               deduct,  maxoop,  prem, nplan,  copay,dl,multMH,
                               exVal));
       }      
     } // for(i<nint) 
     ev = -logl(ev)-psi*prem[k];
+    if (!isfinite(ev)) {
+      //mexPrintf("WARNING(choiceFnNMH): non-finite EV, switching to choiceFnNMHuge\n");
+      return(choiceFnNMHuge(omega,  psi,  muL,  sigL,  xint,  wint, nint,
+                            deduct,  maxoop,  prem, nplan,  copay,dl,multMH,
+                            exVal));
+    }
     exVal[k]=ev;
-    if (k==0 || ev>mev) { 
+    if (J==0 || ev>mev) { 
       mev = ev; 
       J = k+1; 
     }
   } // for(k<nplan) 
-  //mexPrintf("\n");
-  //if (!finitel(mev)) {
-  //  J = 0; // mev is -inf or nan
-  //mexPrintf("WARNING(choiceFnHuge): max E[V] = %Lg\n",mev);
-  //}
+  if (!isfinite(mev)) {
+    J = 0; // mev is -inf or nan
+  }
   return(J);
 }
 
@@ -86,8 +93,12 @@ int choiceFnNMHuge
   mpfr_t mev;
   int k;
   mpfr_init2(mev,PREC);
+  mpfr_set_inf(mev, -1); // initialize to -infinity
   for(k=0;k<nplan;k++) {
-    if (deduct[k] < 0) continue;
+    if (deduct[k] < 0) {
+      exVal[k] = -HUGE_VAL;
+      continue;
+    }
     int i;
     mpfr_t ev;
     mpfr_init2(ev,PREC);
@@ -107,7 +118,8 @@ int choiceFnNMHuge
         if (u0>util) util = u0;  
       } 
       if (m>=deduct[k] + (maxoop[k]-deduct[k])/copay) {
-        if ((-maxoop[k])>util) util = utilfn(m,lambda,omega,maxoop[k],multMH);
+        double u0 = utilfn(m,lambda,omega,maxoop[k],multMH);
+        if (u0>util) util = u0;
       }          
       { 
         mpfr_t euw;
@@ -130,19 +142,17 @@ int choiceFnNMHuge
     //mexPrintf("huge: u(%d)=%Lg \n",k,lev);
     //mexPrintf("huge: u(%d) = %Lg \n",k,mpfr_get_ld(ev,GMP_RNDN));
     exVal[k]=mpfr_get_d(ev,GMP_RNDN);
-    if (k==0 || mpfr_cmp(ev,mev)>0) //(k==0 || ev>mev) 
+    if (J==0 || mpfr_cmp(ev,mev)>0) 
       { 
         mpfr_set(mev,ev,GMP_RNDN); //mev = ev; 
         J = k+1; 
       }
     mpfr_clear(ev);
   } // for(k<nplan) 
+  if ((mpfr_inf_p(mev) && mpfr_sgn(mev) < 0) || mpfr_nan_p(mev)) {
+    J = 0; // mev is -inf or nan
+  }
   mpfr_clear(mev);
-  //mexPrintf("\n");
-  //if (!finitel(mev)) {
-  //  J = 0; // mev is -inf or nan
-  //mexPrintf("WARNING(choiceFnHuge): max E[V] = %Lg\n",mev);
-  //}
   return(J);
 }
 #undef PREC
@@ -182,9 +192,9 @@ void mexFunction
   double *choiceOut;
   double *expectedValue;
   double *ev;
-  if (nrhs!=16 && nrhs!=17) {
+  if (nrhs!=16 && nrhs!=17 && nrhs!=18) {
     mexPrintf("nrhs=%d\n",nrhs);
-    mxAssert(nrhs==16, "Wrong number of arguments");
+    mexErrMsgTxt("Wrong number of arguments: expected 16, 17, or 18");
   }
   /* Get inputs */
   logomega = mxGetPr(prhs[0]);
@@ -200,7 +210,7 @@ void mexFunction
   wint = mxGetPr(prhs[8]);
   np = mxGetDimensions(prhs[9])[0];
   T = mxGetDimensions(prhs[9])[1];
-  N = mxGetDimensions(prhs[9])[2];
+  N = (mxGetNumberOfDimensions(prhs[9]) > 2) ? mxGetDimensions(prhs[9])[2] : 1;
   deduct = mxGetPr(prhs[9]);
   maxoop = mxGetPr(prhs[10]);
   prem = mxGetPr(prhs[11]);
